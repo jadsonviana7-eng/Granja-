@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#172033">
+    <meta name="description" content="Gestão financeira, estoque, produção e plantel da Granja Rancho do Viana.">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="Granja Viana">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>Granja RANCHO DO VIANA</title>
+    <link rel="manifest" href="manifest.webmanifest">
+    <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+    <link rel="apple-touch-icon" href="icons/icon-192.png">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <main class="app-shell">
+    <header class="topbar">
+        <div class="logo-container">
+            <img src="logo.png" alt="Logo Granja">
+        </div>
+        <div class="header-titles">
+            <span class="sub-title">Granja</span>
+            <h1>RANCHO DO VIANA</h1>
+        </div>
+        <div class="today-chip" id="todayLabel"></div>
+    </header>
+
+    <section class="hero">
+        <div class="summary-panel card-grande">
+            <h1 id="saldoMes">R$ 0,00</h1>
+            <div class="summary-grid">
+                <div class="summary-card"><small>Vendas</small><b id="vendasMes">R$ 0,00</b></div>
+                <div class="summary-card"><small>Pendentes</small><b id="pendentesMes">R$ 0,00</b></div>
+                <div class="summary-card"><small>Saídas</small><b id="despesasMes">R$ 0,00</b></div>
+            </div>
+        </div>
+        <div class="stock-panel" id="stockPanel"></div>
+    </section>
+
+    <nav class="tabs" id="topTabs"></nav>
+
+    <section id="page-venda" class="page active">
+        <div class="grid-2">
+            
+            <form class="card" id="saleForm">
+                <div class="card-header">
+                    <h2>Nova Venda</h2>
+                </div>
+
+                <div class="grid-2">
+                    <div class="field">
+                        <label>Data</label>
+                        <input type="date" id="saleDate" required>
+                    </div>
+                    <div class="field">
+                        <label>Cliente</label>
+                        <select id="saleClient" required></select>
+                    </div>
+                </div>
+
+                <div class="grid-2">
+                    <div class="field">
+                    <label>Produto</label>
+                    <select id="saleProduct" onchange="updateProductPrice()" required>
+                        <option value="">Selecione um produto...</option>
+                    </select>
+                </div>
+                    <div class="field">
+                        <label>Quantidade</label>
+                        <input type="number" id="saleQty" step="1" value="1" oninput="calculateSaleTotal()" required>
+                    </div>
+                </div>
+
+                <div class="grid-3" style="background: var(--surface-2); padding: 10px; border-radius: 8px; margin-top: 10px;">
+                    <div class="field">
+                        <label>V. Unitário (R$)</label>
+                        <input type="number" id="saleUnitValue" step="0.01" oninput="calculateSaleTotal()">
+                    </div>
+                    <div class="field">
+                        <label>Desconto (R$)</label>
+                        <input type="number" id="saleDiscount" step="0.01" value="0.00" oninput="calculateSaleTotal()">
+                    </div>
+                    <div class="field">
+                        <label>Total Final</label>
+                        <input type="number" id="saleTotal" step="0.01" style="background: #eef2ff; color: var(--blue); font-weight: 800;" readonly>
+                    </div>
+                </div>
+
+                <div class="grid-2" style="margin-top: 15px;">
+                <div class="field">
+                    <label>Status do Pagamento</label>
+                    <select id="saleStatus">
+                        <option value="pago">Pago</option>
+                        <option value="pendente">Pendente (Fiado)</option>
+                    </select>
+                </div>
+                <div class="field">
+                    <label>Observações</label>
+                    <input type="text" id="saleObs" placeholder="Ex: Pix, Dinheiro...">
+                </div>
+            </div>
+
+                <button type="submit" class="btn primary full">Registrar Venda</button>
+            </form>
+
+            <form class="card" id="expenseForm">
+                <div class="card-header"><h2>Nova Despesa</h2></div>
+                <div class="field"><label>Data da Compra</label><input id="expenseDate" type="date"></div>
+                <div class="field">
+                    <label>Tipo de Lançamento</label>
+                    <select id="expenseMode" onchange="updateExpenseInsumoFields()">
+                        <option value="FINANCEIRO">Apenas despesa financeira</option>
+                        <option value="ESTOQUE">Despesa com entrada no estoque</option>
+                    </select>
+                </div>
+                <div class="field" id="expenseInsumoField">
+                    <label>Insumo comprado</label>
+                    <select id="expenseInsumo" onchange="updateExpenseInsumoFields()"></select>
+                    <small id="expenseStockInfo" class="hint-text">Selecione um insumo para atualizar o estoque.</small>
+                </div>
+                <div class="field"><label>Descrição</label><input id="expenseDesc" type="text" placeholder="Ex: Milho, Energia, etc"></div>
+                
+                <div class="grid-3" style="background: var(--surface-2); padding: 10px; border-radius: 8px;">
+                    <div class="field"><label id="expenseQtyLabel">Qtd</label><input id="expenseQty" type="number" value="1" min="0" step="0.01" oninput="calculateExpenseTotal()"></div>
+                    <div class="field"><label>V. Unitário (R$)</label><input id="expenseUnitValue" type="number" step="0.01" oninput="calculateExpenseTotal()"></div>
+                    <div class="field"><label>Total (R$)</label><input id="expenseValue" type="number" step="0.01" readonly style="background: #fee2e2; color: var(--red); font-weight: 800;"></div>
+                </div>
+
+                <div class="field" style="margin-top: 15px;">
+                    <label>Forma de Pagamento</label>
+                    <select id="expensePaymentMethod" onchange="toggleExpenseInstallments()">
+                        <option value="Pix">Pix</option>
+                        <option value="Dinheiro">Dinheiro</option>
+                        <option value="Cartão de Crédito">Cartão de Crédito</option>
+                    </select>
+                </div>
+
+                <div id="expenseInstallmentSection" style="display: none; background: #f8fafc; padding: 15px; border-radius: 8px; border: 1px solid var(--line);">
+                    <div class="grid-2">
+                        <div class="field">
+                            <label>Nº de Parcelas</label>
+                            <input id="expenseInstallments" type="number" value="1" min="1" oninput="calculateExpenseTotal()">
+                        </div>
+                        <div class="field">
+                            <label>Dia de Vencimento</label>
+                            <input id="expenseDueDay" type="number" placeholder="Ex: 10" min="1" max="31">
+                        </div>
+                    </div>
+                    <div class="field">
+                        <label>Valor da Parcela (R$)</label>
+                        <input id="expenseInstallmentValue" type="text" readonly style="background: #e2e8f0; font-weight: bold;">
+                    </div>
+                </div>
+                
+                <button class="btn red full" type="submit" style="margin-top: 15px;">Salvar Despesa</button>
+            </form>
+        </div>
+    </section>
+
+    <section id="page-producao" class="page">
+        <div class="grid-2">
+            <form class="card" id="productionForm">
+                <div class="card-header"><h2>Coleta Diária</h2></div>
+                <div class="field"><label>Data</label><input id="prodDate" type="date"></div>
+                <div class="field"><label>Tipo de Ovo</label><select id="prodType"><option>Grande</option><option>Medio</option><option>Pequeno</option></select></div>
+                <div class="grid-2">
+                    <div class="field"><label>Coletados</label><input id="prodCollected" type="number" min="0"></div>
+                    <div class="field"><label>Perdas</label><input id="prodLoss" type="number" value="0"></div>
+                </div>
+                <button class="btn blue full" type="submit">Salvar Produção</button>
+            </form>
+
+            <div class="card">
+                <div class="card-header"><h2>Histórico de Coletas</h2></div>
+                <div class="list" id="coletaList"></div>
+            </div>
+        </div>
+    </section>
+
+    <section id="page-extrato" class="page">
+        <div class="card">
+            <div class="card-header">
+                <h2>Extrato</h2>
+            </div>
+
+            <div class="toolbar-extrato" style="margin-bottom: 15px; padding: 10px; background: #f9f9f9; border-radius: 8px;">
+                <div class="filter-row" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px;">
+                    <div class="field" style="margin:0">
+                        <label><small>Início</small></label>
+                        <input type="date" id="filterStart">
+                    </div>
+                    <div class="field" style="margin:0">
+                        <label><small>Fim</small></label>
+                        <input type="date" id="filterEnd">
+                    </div>
+                    <div class="field" style="margin:0">
+                        <label><small>Tipo</small></label>
+                        <select id="filterType">
+                            <option value="TODOS">Todos</option>
+                            <option value="VENDA">Vendas</option>
+                            <option value="SAIDA">Despesas</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="action-row" style="display: flex; justify-content: space-between; align-items: center; margin-top: 15px; padding-top: 10px; border-top: 1px solid #ddd;">
+                    <span id="extractCount" style="font-size: 0.85rem; color: #666; font-weight: bold;">0 registros</span>
+                    
+                    <div class="button-group-actions" style="display: flex; gap: 8px;">
+                        <button type="button" class="btn-action csv" onclick="exportarCSV()" title="Exportar Excel">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
+                            Excel
+                        </button>
+                        <button type="button" class="btn-action pdf" onclick="exportarPDF()" title="Gerar PDF">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9V2h12v7"></path><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
+                            PDF
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div id="extractList" class="list">
+                </div>
+        </div>
+    </section>
+    <section id="page-cadastro" class="page">
+        <div class="grid-2">
+            <div class="card" style="margin-bottom: 20px; border-left: 5px solid var(--amber);">
+                <div class="card-header">
+                    <h2><i class="fas fa-kiwi-bird"></i> Gerenciamento do Plantel</h2>
+                </div>
+                <div style="padding: 10px;">
+                    <div class="grid-2">
+                        <div class="field">
+                            <label>Inicial (0-6 sem.)</label>
+                            <input type="number" class="plantel-input" data-fase="inicial" value="0" min="0" onchange="saveGalinhas()">
+                        </div>
+                        <div class="field">
+                            <label>Crescimento (7-17 sem.)</label>
+                            <input type="number" class="plantel-input" data-fase="crescimento" value="0" min="0" onchange="saveGalinhas()">
+                        </div>
+                        <div class="field">
+                            <label>Pré-Postura (18-20 sem.)</label>
+                            <input type="number" class="plantel-input" data-fase="prePostura" value="0" min="0" onchange="saveGalinhas()">
+                        </div>
+                        <div class="field">
+                            <label>Postura (20+ sem.)</label>
+                            <input type="number" class="plantel-input" data-fase="postura" value="0" min="0" onchange="saveGalinhas()">
+                        </div>
+                    </div>
+
+                    <div id="detalheConsumoPorFase" style="margin-top: 15px; padding: 10px; background: rgba(0,0,0,0.03); border-radius: 8px; font-size: 0.85rem;">
+                        </div>
+
+                    <div style="margin-top: 15px; padding-top: 10px; border-top: 1px solid var(--line); display: flex; justify-content: space-between; align-items: center;">
+                        <div>
+                            <span style="color: var(--muted); font-size: 0.85rem;">Total de Aves:</span>
+                            <b id="totalAvesGeral" style="color: var(--ink);">0</b>
+                        </div>
+                        <div style="text-align: right;">
+                            <span style="color: var(--muted); font-size: 0.85rem;">Consumo total:</span>
+                            <b style="color: var(--red);"><span id="consumoDiarioEstimado">0</span> kg/dia</b>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <form class="card" id="clientForm">
+                <div class="card-header"><h2><i class="fas fa-user-plus"></i> Novo Cliente</h2></div>
+                <div class="field">
+                    <label>Nome Completo</label>
+                    <input id="clientName" type="text" placeholder="Ex: João Silva">
+                </div>
+                <div class="grid-2">
+                    <div class="field">
+                        <label>Telefone / WhatsApp</label>
+                        <input id="clientPhone" type="tel" placeholder="(00) 00000-0000">
+                    </div>
+                    <div class="field">
+                        <label>Cidade</label>
+                        <input id="clientCity" type="text" placeholder="Ex: União dos Palmares">
+                    </div>
+                </div>
+                <button class="btn primary full" type="submit">Salvar Cliente</button>
+                <div class="list" id="clientList" style="margin-top:15px"></div>
+            </form>
+
+            <form class="card" id="productForm">
+                <div class="card-header"><h2><i class="fas fa-box"></i> Novo Produto</h2></div>
+                <div class="field">
+                    <label>Nome do Produto</label>
+                    <input id="productName" type="text" placeholder="Ex: Bandeja 30 G">
+                </div>
+                <div class="grid-3">
+                    <div class="field">
+                        <label>Preço R$</label>
+                        <input id="productPrice" type="number" step="0.01">
+                    </div>
+                    <div class="field">
+                        <label>Tipo Ovo</label>
+                        <select id="productType">
+                            <option>Grande</option>
+                            <option value="Medio">Médio</option>
+                            <option>Pequeno</option>
+                        </select>
+                    </div>
+                    <div class="field">
+                        <label>Qtd Ovos</label>
+                        <input id="productEggs" type="number" value="30">
+                    </div>
+                </div>
+
+                <div class="field" style="margin-top: 10px;">
+                    <label style="color: var(--blue); font-weight: bold;">
+                        <i class="fas fa-layer-group"></i> Composição (Baixa Automática)
+                    </label>
+                    <div id="productCompositionList" class="composition-container">
+                        </div>
+                    <small style="color: var(--muted); display: block; margin-top: 5px;">
+                        Informe a quantidade gasta para <b>uma unidade</b> deste produto.
+                    </small>
+                </div>
+
+                <button class="btn primary full" type="submit" style="margin-top: 10px;">Salvar Produto</button>
+                <div class="list" id="productList" style="margin-top:15px"></div>
+            </form>
+
+            <form class="card" id="insumoForm">
+                <div class="card-header">
+                    <h2><i class="fas fa-flask"></i> Cadastrar Insumo</h2>
+                </div>
+                
+                <div class="field">
+                    <label>Nome do Insumo</label>
+                    <input id="insumoName" type="text" placeholder="Ex: Bandeja Papelão 30">
+                </div>
+
+                <div style="background: var(--surface-2); padding: 12px; border-radius: var(--radius); margin-bottom: 15px; border: 1px solid var(--line);">
+                    <label style="font-weight: 600; color: var(--ink); display: block; margin-bottom: 8px;">Tipo de Insumo</label>
+                    <select id="insumoTipoConsumo" onchange="toggleUnitIndicator()" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--line);">
+                        <option value="GERAL">Embalagem / Outros (un)</option>
+                        <option value="inicial">Ração: Inicial (kg)</option>
+                        <option value="crescimento">Ração: Crescimento (kg)</option>
+                        <option value="prePostura">Ração: Pré-Postura (kg)</option>
+                        <option value="postura">Ração: Postura (kg)</option>
+                    </select>
+                    <small style="color: var(--muted); display: block; margin-top: 5px;">Rações entram e saem em kg. Os demais insumos entram como unidades.</small>
+                </div>
+
+                <div class="field">
+                    <label id="insumoQtyLabel">Estoque Inicial (un)</label>
+                    <div style="position: relative;">
+                        <input id="insumoQtyInitial" type="number" value="0" min="0" step="0.01" style="padding-right: 45px;">
+                        <span id="unitIndicator" style="position: absolute; right: 15px; top: 50%; transform: translateY(-50%); color: var(--muted); font-size: 0.8rem; font-weight: bold;">un</span>
+                    </div>
+                </div>
+
+                <button class="btn blue full" type="submit">
+                    <i class="fas fa-plus"></i> Cadastrar Insumo
+                </button>
+                
+                <div class="list" id="insumoList" style="margin-top:15px"></div>
+            </form>
+        </div>
+    </section>
+
+    <section id="page-dados" class="page">
+    <div class="card">
+        <div class="card-header">
+            <h2>Sincronização Nuvem</h2>
+        </div>
+        
+        <p style="color: var(--muted); font-size: 0.9rem; margin-bottom: 15px;">
+            Gerencie o backup dos seus dados na nuvem ou limpe o banco de dados local.
+        </p>
+
+        <div id="syncProgressContainer" style="display: none; width: 100%; background: #f1f5f9; border: 1px solid #dfe7ef; border-radius: 12px; padding: 15px; margin-bottom: 20px;">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                <span id="syncStatusText" style="font-size: 13px; font-weight: 800; color: #2563eb;">Iniciando...</span>
+                <span id="syncPercentage" style="font-size: 13px; font-weight: 800; color: #64748b;">0%</span>
+            </div>
+            <div style="width: 100%; background: #dfe7ef; height: 10px; border-radius: 5px; overflow: hidden;">
+                <div id="syncProgressBar" style="width: 0%; height: 100%; background: #2563eb; transition: width 0.4s ease-in-out;"></div>
+            </div>
+        </div>
+
+        <div id="syncProgressContainer" style="display: none; width: 100%; background: #f1f5f9; border: 1px solid #dfe7ef; border-radius: 12px; padding: 15px; margin-bottom: 20px;">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                <span id="syncStatusText" style="font-size: 13px; font-weight: 800; color: #2563eb;">Iniciando...</span>
+                <span id="syncPercentage" style="font-size: 13px; font-weight: 800; color: #64748b;">0%</span>
+            </div>
+            <div style="width: 100%; background: #dfe7ef; height: 10px; border-radius: 5px; overflow: hidden;">
+                <div id="syncProgressBar" style="width: 0%; height: 100%; background: #2563eb; transition: width 0.4s ease-in-out;"></div>
+            </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 10px;">
+            <button class="btn primary" onclick="syncToCloud()">Salvar na Nuvem</button>
+            <button class="btn blue" onclick="loadFromCloud()">Carregar da Nuvem</button>
+        </div>
+
+        <hr style="border: 0; border-top: 1px solid var(--line); margin: 20px -20px;">
+
+        <div class="field">
+            <label>Zona de Perigo</label>
+            <button class="btn red full" onclick="resetApp()">Zerar Tudo (Local)</button>
+        </div>
+    </div>
+</section>
+</main>
+
+    <nav class="bottom-nav" id="bottomTabs"></nav>
+    <div class="toast" id="toast"></div>
+
+<div id="editModal" class="modal-overlay" style="display:none;">
+    <div class="modal-content card">
+        <div class="card-header">
+            <h2>Editar Lançamento</h2>
+            <button class="btn small red" onclick="closeEditModal()">X</button>
+        </div>
+        
+        <form id="editForm">
+            <input type="hidden" id="editId">
+            
+            <div class="field">
+                <label>Data</label>
+                <input type="date" id="editDate" required>
+            </div>
+
+            <div class="field">
+                <label>Cliente / Descrição</label>
+                <input type="text" id="editCliente">
+            </div>
+
+            <div class="grid-2">
+                <div class="field">
+                    <label>Quantidade</label>
+                    <input type="number" id="editQty" step="1" oninput="calcEditTotal()">
+                </div>
+                <div class="field">
+                    <label>V. Unitário</label>
+                    <input type="number" id="editUnit" step="0.01" oninput="calcEditTotal()">
+                </div>
+            </div>
+
+            <div class="grid-2">
+                <div class="field">
+                    <label>Desconto (R$)</label>
+                    <input type="number" id="editDisc" step="0.01" oninput="calcEditTotal()">
+                </div>
+                <div class="field">
+                    <label>Total Final</label>
+                    <input type="number" id="editTotal" readonly style="background:var(--surface-2)">
+                </div>
+            </div>
+
+            <div class="field">
+                <label>Status de Pagamento</label>
+                <select id="editStatus">
+                    <option value="pago">Pago / Concluído</option>
+                    <option value="pendente">Pendente / Fiado</option>
+                </select>
+            </div>
+
+            <div class="field">
+                <label>Observações</label>
+                <input type="text" id="editObs">
+            </div>
+
+            <div class="button-group" style="margin-top:20px; flex-direction: row !important;">
+                <button type="button" class="btn red" onclick="deleteCurrentItem()" style="flex:1">Excluir</button>
+                <button type="submit" class="btn primary" style="flex:2">Salvar Alterações</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+
+    <script src="script.js"></script>
+</body>
+</html>
