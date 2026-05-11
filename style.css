@@ -55,12 +55,12 @@
 
         .header-titles h1 {
             margin: 0;
-            font-size: 2.5rem;
+            font-size: 2rem;
             line-height: 0.8;
         }
 
         .sub-title {
-            font-size: 1.6rem;
+            font-size: 1.3rem;
             text-transform: uppercase;
             letter-spacing: 1px;
             color: var(--muted);
