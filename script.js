@@ -1055,10 +1055,10 @@ function init() {
 
 document.addEventListener("DOMContentLoaded", init);
 
-if ("serviceWorker" in navigator) {
-    window.addEventListener("load", () => {
-        navigator.serviceWorker.register("./sw.js").catch((error) => {
-            console.warn("Service worker não registrado:", error);
-        });
-    });
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js')
+      .then(reg => console.log('Service Worker registrado!', reg))
+      .catch(err => console.error('Erro ao registrar SW:', err));
+  });
 }
