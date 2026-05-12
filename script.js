@@ -88,9 +88,16 @@ function normalizeEggType(tipo) {
     return tipo === "Médio" ? "Medio" : (tipo || "Grande");
 }
 
+// Função principal de salvamento (Local + Nuvem)
 function save() {
+    // 1. Salva no localStorage (Segurança local)
     localStorage.setItem(STORE_KEY, JSON.stringify(db));
+    
+    // 2. Renderiza a interface para o usuário ver a mudança na hora
     render();
+
+    // 3. Envia para o Google Sheets (Sincronização na Nuvem)
+    syncToCloud();
 }
 
 function esc(str) {
@@ -382,14 +389,50 @@ function renderExtract() {
 }
 
 function renderColetas() {
-    const list = document.getElementById("coletaList");
-    if (!list) return;
-    list.innerHTML = db.coletas.slice().reverse().map(c => `
-        <div class="item">
-            <div><b>${formatarDataBR(c.data)} - ${esc(c.tipo)}</b><small>Líquido: ${c.liquido} (Perda: ${c.perda})</small></div>
-            <button class="icon-btn danger" type="button" onclick="deleteItem('coletas', ${c.id})" title="Excluir coleta" aria-label="Excluir coleta">${deleteIcon()}</button>
-        </div>
-    `).join("");
+    const lista = document.getElementById("listaColetasDiarias");
+    const filtroData = document.getElementById("filtroDataColeta");
+    if (!lista) return;
+
+    let mesFiltro, anoFiltro;
+
+    if (filtroData && filtroData.value) {
+        // Se o usuário escolheu uma data no input type="month" (YYYY-MM)
+        const partes = filtroData.value.split("-");
+        anoFiltro = parseInt(partes[0]);
+        mesFiltro = parseInt(partes[1]) - 1;
+    } else {
+        // Padrão: Mês atual
+        const agora = new Date();
+        mesFiltro = agora.getMonth();
+        anoFiltro = agora.getFullYear();
+        // Define o valor do input para o mês atual visualmente
+        if (filtroData) filtroData.value = `${anoFiltro}-${String(mesFiltro + 1).padStart(2, '0')}`;
+    }
+
+    const coletasFiltradas = db.coletas.filter(coleta => {
+        const d = new Date(coleta.data + "T12:00:00");
+        return d.getMonth() === mesFiltro && d.getFullYear() === anoFiltro;
+    });
+
+    let html = "";
+    if (coletasMesVigente.length === 0) {
+        html = '<div style="text-align:center; padding:20px; color:var(--muted);">Nenhuma coleta registrada neste mês.</div>';
+    } else {
+        coletasMesVigente.forEach(item => {
+            html += `
+                <div class="item-lista">
+                    <div class="item-info">
+                        <b>${formatDate(item.data)}</b> - ${item.tipo}
+                        <span>${item.liquido} ovos</span>
+                    </div>
+                    <button class="btn-icon red" onclick="deleteItem('coletas', ${item.id})">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>`;
+        });
+    }
+
+    lista.innerHTML = html;
 }
 
 function renderPlantel() {
@@ -969,21 +1012,47 @@ function atualizarBarra(p, t) {
 }
 
 async function syncToCloud() {
-    atualizarBarra(10, "Preparando dados...");
+    if (!CLOUD_URL) return;
+
+    // Consolidando o estoque de insumos para facilitar a leitura na planilha
+    const estoqueInsumosConsolidado = (db.insumos || []).map(i => ({
+        item: i.nome,
+        tipo: "INSUMO",
+        quantidade: i.qtd,
+        unidade: i.unidade || "un"
+    }));
+
+    // Consolidando o estoque de ovos
+    const estoqueOvosConsolidado = Object.keys(db.estoque || {}).map(tipo => ({
+        item: `Ovo ${tipo}`,
+        tipo: "OVO",
+        quantidade: db.estoque[tipo],
+        unidade: "un"
+    }));
+
+    const payload = {
+        action: "syncFull",
+        data: {
+            producao: db.coletas || [],
+            extrato: db.historico || [],
+            plantel: db.config.plantel || {},
+            produtos: db.produtos || [],
+            insumos: db.insumos || [],
+            clientes: db.clientes || [],
+            // Nova lista enviando TODO o estoque consolidado
+            estoque_geral: [...estoqueOvosConsolidado, ...estoqueInsumosConsolidado]
+        }
+    };
+
     try {
-        atualizarBarra(40, "Conectando ao Google...");
         await fetch(CLOUD_URL, {
             method: "POST",
             mode: "no-cors",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(db)
+            body: JSON.stringify(payload)
         });
-        atualizarBarra(100, "Sincronização concluída!");
-        toast("Backup enviado com sucesso!");
-    } catch (e) {
-        console.error(e);
-        atualizarBarra(0, "Erro na conexão");
-        toast("Erro ao salvar na nuvem.");
+        console.log("Sincronização completa enviada.");
+    } catch (error) {
+        console.error("Erro na sincronização:", error);
     }
 }
 
