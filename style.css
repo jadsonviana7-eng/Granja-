@@ -583,29 +583,66 @@
     display: block; 
 }
 
-/* --- CONFIGURAÇÃO PARA CELULAR (MOBILE) --- */
+/* --- SISTEMA DE ABAS FINANCEIRO (MOBILE) --- */
+.mobile-tabs {
+    display: none; /* Escondido no PC */
+    background: var(--surface-2);
+    padding: 5px;
+    border-radius: var(--radius);
+    margin: 10px 15px; /* Espaçamento lateral para não grudar na borda */
+    gap: 5px;
+}
+
+.tab-item {
+    padding: 12px 5px;
+    border: none;
+    border-radius: 8px;
+    background: transparent;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 14px;
+    color: var(--muted);
+    transition: all 0.3s ease;
+    text-align: center;
+}
+
+.tab-item.active {
+    background: var(--surface);
+    color: var(--blue);
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
+}
+
+/* --- AJUSTES DE EXIBIÇÃO --- */
+
+/* No PC: Mostra tudo e esconde as abas */
+.form-section {
+    display: block;
+}
+
 @media (max-width: 600px) {
-    .mobile-tabs { 
-        display: grid; 
-        grid-template-columns: 1fr 1fr; 
-        margin-bottom: 10px;
-    }
-    
-    .desktop-only { 
-        display: none; 
-    } 
-
-    /* Aqui sim, no mobile, escondemos por padrão e mostramos só a ativa */
-    .form-section { 
-        display: none; 
-    }
-    
-    .form-section.active { 
-        display: block !important; 
+    .mobile-tabs {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
     }
 
-    .grid-2.financeiro-container { 
-        display: block; /* Empilha os cards no celular */
+    /* Esconde o título do card no mobile para as abas serem o título */
+    .desktop-only {
+        display: none !important;
+    }
+
+    /* Lógica de esconder o formulário inativo */
+    .form-section {
+        display: none;
+    }
+
+    .form-section.active {
+        display: block !important;
+    }
+
+    /* No mobile, removemos as margens extras da grid para os cards não ficarem pequenos */
+    .grid-2.financeiro-container {
+        display: block;
+        padding: 0 5px;
     }
     
     #desktopHeader {
