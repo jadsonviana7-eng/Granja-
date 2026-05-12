@@ -184,6 +184,27 @@
         
         .today-chip { display: inline-flex; align-items: center; min-height: 36px; padding: 0 12px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); color: var(--muted); font-size: .84rem; font-weight: 700; }
 
+        .install-app-btn {
+            min-height: 36px;
+            border: 1px solid rgba(21, 150, 95, .25);
+            border-radius: 999px;
+            padding: 0 14px;
+            background: #e4f8ee;
+            color: #0f7045;
+            font-size: .84rem;
+            font-weight: 900;
+            white-space: nowrap;
+        }
+
+        .install-app-btn:hover {
+            background: #d7f3e5;
+            transform: translateY(-1px);
+        }
+
+        .install-app-btn[hidden] {
+            display: none;
+        }
+
         .hero { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(280px, .9fr); gap: 14px; margin-bottom: 14px; }
         .summary-panel { background: linear-gradient(135deg, #142033, #203149); color: #fff; border-radius: 16px; padding: 18px; box-shadow: var(--shadow); }
         .summary-panel h1 { margin: 0 0 6px; font-size: clamp(1.7rem, 4vw, 3.2rem); line-height: 1; }

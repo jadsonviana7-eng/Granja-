@@ -1047,6 +1047,7 @@ function init() {
     buildTabs();
     decorateCardHeaders();
     bindForms();
+    setupPwaInstallButton();
     setDefaultDates();
     processarConsumoRacao();
     render();
@@ -1055,10 +1056,37 @@ function init() {
 
 document.addEventListener("DOMContentLoaded", init);
 
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./sw.js')
-      .then(reg => console.log('Service Worker registrado!', reg))
-      .catch(err => console.error('Erro ao registrar SW:', err));
-  });
+if ("serviceWorker" in navigator) {
+    window.addEventListener("load", () => {
+        navigator.serviceWorker.register("./sw.js").catch((error) => {
+            console.warn("Service worker não registrado:", error);
+        });
+    });
+}
+
+let deferredInstallPrompt = null;
+
+function setupPwaInstallButton() {
+    const installButton = document.getElementById("installAppBtn");
+    if (!installButton) return;
+
+    window.addEventListener("beforeinstallprompt", (event) => {
+        event.preventDefault();
+        deferredInstallPrompt = event;
+        installButton.hidden = false;
+    });
+
+    installButton.addEventListener("click", async () => {
+        if (!deferredInstallPrompt) return;
+        installButton.hidden = true;
+        deferredInstallPrompt.prompt();
+        await deferredInstallPrompt.userChoice;
+        deferredInstallPrompt = null;
+    });
+
+    window.addEventListener("appinstalled", () => {
+        installButton.hidden = true;
+        deferredInstallPrompt = null;
+        toast("App instalado com sucesso!");
+    });
 }
