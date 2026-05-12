@@ -584,92 +584,86 @@
         }
 
         /* --- SISTEMA DE ABAS FINANCEIRO (MOBILE) --- */
-        ..mobile-tabs {
-    display: none; /* Escondido no PC */
-    grid-template-columns: 1fr 1fr;
-    background: var(--surface-2);
-    margin: 10px 0 0 0; /* Encosta no card abaixo */
-    padding: 0;
-    border-top-left-radius: var(--radius);
-    border-top-right-radius: var(--radius);
-    overflow: hidden;
-    border: 1px solid var(--line);
-    border-bottom: none;
+       /* --- CONFIGURAÇÃO PARA PC (DESKTOP) --- */
+/* Esconde as abas no computador */
+.mobile-tabs { 
+    display: none; 
 }
 
+/* Garante que os formulários apareçam sempre no PC */
+#section-venda, 
+#section-despesa {
+    display: block !important;
+}
+
+/* --- CONFIGURAÇÃO PARA CELULAR (MOBILE) --- */
+@media (max-width: 600px) {
+    /* Exibe as abas coladas no card */
+    .mobile-tabs {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        background: var(--surface);
+        margin: 0; /* Colado nas laterais */
+        padding: 0;
+        border-top-left-radius: var(--radius);
+        border-top-right-radius: var(--radius);
+        overflow: hidden;
+        border: 1px solid var(--line);
+        border-bottom: none;
+    }
+
     .tab-item {
-        padding: 14px 5px;
+        padding: 15px 5px;
         border: none;
-        background: #f1f5f9;
+        background: #f8fafc;
         color: var(--muted);
         font-weight: 700;
-        font-size: 13px;
+        font-size: 12px;
         display: flex;
         align-items: center;
         justify-content: center;
-        gap: 8px;
-        transition: 0.2s;
+        gap: 6px;
         text-transform: uppercase;
     }
 
-    /* Estilo dos ícones dentro das abas */
-    .tab-icon svg {
-        width: 18px;
-        height: 18px;
-        fill: none;
-        stroke: currentColor;
-        stroke-width: 2;
-        stroke-linecap: round;
-        stroke-linejoin: round;
-    }
-
-    /* --- CORES CRISTAL (ATIVAS) --- */
-
-    /* Aba Venda: Verde Cristal */
+    /* Cores Cristal Ativas */
     .tab-venda.active {
-        background: #ecfdf5 !important; 
+        background: #ecfdf5 !important;
         color: var(--green) !important;
-        border-bottom: 3px solid var(--green);
+        border-bottom: 4px solid var(--green);
     }
-
-    /* Aba Despesa: Vermelho Cristal */
     .tab-despesa.active {
-        background: #fef2f2 !important; 
+        background: #fef2f2 !important;
         color: var(--red) !important;
-        border-bottom: 3px solid var(--red);
+        border-bottom: 4px solid var(--red);
     }
 
-    /* --- AJUSTES DE FUSÃO NO MOBILE --- */
-    @media (max-width: 600px) {
-        .mobile-tabs { display: grid; }
-        
-        /* Remove o arredondado do topo do card para ele "colar" na aba */
-        .form-section .card {
-            border-top-left-radius: 0 !important;
-            border-top-right-radius: 0 !important;
-            margin-top: 0 !important;
-            border-top: none !important;
-            box-shadow: none; /* Opcional: remove sombra superior para parecer peça única */
-        }
+    /* Fusão com o card: Remove arredondado de cima do card */
+    .form-section .card {
+        border-top-left-radius: 0 !important;
+        border-top-right-radius: 0 !important;
+        border-top: none !important;
+        margin-top: 0 !important;
+    }
 
-        .desktop-only { display: none !important; }
+    /* Lógica de abas: Esconde o que não estiver ativo */
+    .form-section {
+        display: none !important;
+    }
+    .form-section.active {
+        display: block !important;
+    }
 
-        /* Lógica de esconder o formulário inativo */
-        .form-section {
-            display: none;
-        }
+    /* Títulos e Grids */
+    .desktop-only { display: none !important; }
+    .grid-2.financeiro-container { display: block !important; }
+}
 
-        .form-section.active {
-            display: block !important;
-        }
-
-        /* No mobile, removemos as margens extras da grid para os cards não ficarem pequenos */
-        .grid-2.financeiro-container {
-            display: block;
-            padding: 0 5px;
-        }
-        
-        #desktopHeader {
-            display: none; /* Ganha espaço no celular */
-        }
+/* Estilo do ícone */
+.tab-icon svg {
+    width: 18px;
+    height: 18px;
+    stroke: currentColor;
+    fill: none;
+    stroke-width: 2.5;
 }
