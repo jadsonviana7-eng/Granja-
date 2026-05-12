@@ -44,17 +44,24 @@
 
     <section id="page-venda" class="page active">
     <div class="mobile-tabs">
-        <button type="button" class="tab-item active" onclick="switchForm('venda')">Nova Venda</button>
-        <button type="button" class="tab-item" onclick="switchForm('despesa')">Nova Despesa</button>
+        <button type="button" class="tab-item tab-venda active" onclick="switchForm('venda')">
+            <span class="tab-icon">
+                <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2.5" fill="none"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
+            </span>
+            Vendas
+        </button>
+        <button type="button" class="tab-item tab-despesa" onclick="switchForm('despesa')">
+            <span class="tab-icon">
+                <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2.5" fill="none"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline><polyline points="17 6 23 6 23 12"></polyline></svg>
+            </span>
+            Despesas
+        </button>
             </div>
 
             <div class="grid-2 financeiro-container">
-                
-                <div id="section-venda" class="form-section active">
-                    <form class="card shadow" id="saleForm">
-                        <div class="card-header desktop-only">
-                            <h2>Nova Venda</h2>
-                        </div>
+        <div id="section-venda" class="form-section active">
+            <form class="card shadow" id="saleForm">
+                <div class="card-header desktop-only"><h2>Nova Venda</h2></div>
                         <div style="padding: 15px;">
                             <div class="grid-2">
                                 <div class="field">
@@ -113,11 +120,10 @@
                     </form>
                 </div>
 
-                <div id="section-despesa" class="form-section">
-                    <form class="card shadow" id="expenseForm">
-                        <div class="card-header desktop-only">
-                            <h2>Nova Despesa</h2>
-                        </div>
+                <div class="grid-2 financeiro-container">
+                <div id="section-venda" class="form-section active">
+                    <form class="card shadow" id="saleForm">
+                        <div class="card-header desktop-only"><h2>Nova Venda</h2></div>
                         <div style="padding: 15px;">
                             <div class="field">
                                 <label>Data da Compra</label>

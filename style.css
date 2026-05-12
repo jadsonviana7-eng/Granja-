@@ -583,87 +583,67 @@
             display: block; 
         }
 
-        /* --- SISTEMA DE ABAS FINANCEIRO (MOBILE) --- */
-       /* --- CONFIGURAÇÃO PARA PC (DESKTOP) --- */
-/* Esconde as abas no computador */
-.mobile-tabs { 
-    display: none; 
-}
+        /* --- COMPORTAMENTO PADRÃO (PC/DESKTOP) --- */
+        .mobile-tabs { display: none; } /* Esconde abas no PC */
 
-/* Garante que os formulários apareçam sempre no PC */
-#section-venda, 
-#section-despesa {
-    display: block !important;
-}
+        /* No PC, força os dois formulários a ficarem visíveis */
+        #section-venda, #section-despesa {
+            display: block !important;
+        }
 
-/* --- CONFIGURAÇÃO PARA CELULAR (MOBILE) --- */
-@media (max-width: 600px) {
-    /* Exibe as abas coladas no card */
-    .mobile-tabs {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        background: var(--surface);
-        margin: 0; /* Colado nas laterais */
-        padding: 0;
-        border-top-left-radius: var(--radius);
-        border-top-right-radius: var(--radius);
-        overflow: hidden;
-        border: 1px solid var(--line);
-        border-bottom: none;
-    }
+        /* --- COMPORTAMENTO MOBILE (CELULAR) --- */
+        @media (max-width: 600px) {
+            .mobile-tabs {
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                background: #f1f5f9;
+                margin: 10px 0 0 0;
+                border-radius: 12px 12px 0 0;
+                border: 1px solid var(--line);
+                border-bottom: none;
+                overflow: hidden;
+            }
 
-    .tab-item {
-        padding: 15px 5px;
-        border: none;
-        background: #f8fafc;
-        color: var(--muted);
-        font-weight: 700;
-        font-size: 12px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        gap: 6px;
-        text-transform: uppercase;
-    }
+            .tab-item {
+                padding: 14px;
+                border: none;
+                background: #f8fafc;
+                color: var(--muted);
+                font-weight: bold;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                gap: 8px;
+            }
 
-    /* Cores Cristal Ativas */
-    .tab-venda.active {
-        background: #ecfdf5 !important;
-        color: var(--green) !important;
-        border-bottom: 4px solid var(--green);
-    }
-    .tab-despesa.active {
-        background: #fef2f2 !important;
-        color: var(--red) !important;
-        border-bottom: 4px solid var(--red);
-    }
+            /* Cores Cristal Ativas */
+            .tab-venda.active {
+                background: #ecfdf5 !important; /* Verde Cristal */
+                color: var(--green) !important;
+                border-bottom: 4px solid var(--green);
+            }
 
-    /* Fusão com o card: Remove arredondado de cima do card */
-    .form-section .card {
-        border-top-left-radius: 0 !important;
-        border-top-right-radius: 0 !important;
-        border-top: none !important;
-        margin-top: 0 !important;
-    }
+            .tab-despesa.active {
+                background: #fef2f2 !important; /* Vermelho Cristal */
+                color: var(--red) !important;
+                border-bottom: 4px solid var(--red);
+            }
 
-    /* Lógica de abas: Esconde o que não estiver ativo */
-    .form-section {
-        display: none !important;
-    }
-    .form-section.active {
-        display: block !important;
-    }
+            /* Esconde o formulário inativo no celular */
+            .form-section { display: none !important; }
+            .form-section.active { display: block !important; }
 
-    /* Títulos e Grids */
-    .desktop-only { display: none !important; }
-    .grid-2.financeiro-container { display: block !important; }
-}
+            /* Ajuste para colar o card na aba */
+            .form-section .card {
+                border-top-left-radius: 0 !important;
+                border-top-right-radius: 0 !important;
+                margin-top: 0 !important;
+                border-top: none !important;
+            }
 
-/* Estilo do ícone */
-.tab-icon svg {
-    width: 18px;
-    height: 18px;
-    stroke: currentColor;
-    fill: none;
-    stroke-width: 2.5;
-}
+            .desktop-only { display: none !important; }
+            .grid-2.financeiro-container { display: block !important; }
+        }
+
+        /* Estilo do ícone SVG */
+        .tab-icon svg { vertical-align: middle; }

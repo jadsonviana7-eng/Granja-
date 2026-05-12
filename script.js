@@ -1322,9 +1322,11 @@ function bindForms() {
 }
 
 function switchForm(tipo) {
-    document.querySelectorAll('.tab-item').forEach(b => b.classList.remove('active'));
+    // 1. Remove o 'active' de todos os botões e adiciona no clicado
+    document.querySelectorAll('.tab-item').forEach(btn => btn.classList.remove('active'));
     event.currentTarget.classList.add('active');
 
+    // 2. Controla qual seção aparece
     if (tipo === 'venda') {
         document.getElementById('section-venda').classList.add('active');
         document.getElementById('section-despesa').classList.remove('active');
