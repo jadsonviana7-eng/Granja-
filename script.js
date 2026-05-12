@@ -1322,18 +1322,18 @@ function bindForms() {
 }
 
 function switchForm(tipo) {
-    // 1. Remove o 'active' de todos os botões e adiciona no clicado
+    // 1. Alterna as abas
     document.querySelectorAll('.tab-item').forEach(btn => btn.classList.remove('active'));
-    event.currentTarget.classList.add('active');
+    document.querySelector(`.tab-${tipo}`).classList.add('active');
 
-    // 2. Controla qual seção aparece
-    if (tipo === 'venda') {
-        document.getElementById('section-venda').classList.add('active');
-        document.getElementById('section-despesa').classList.remove('active');
-    } else {
-        document.getElementById('section-venda').classList.remove('active');
-        document.getElementById('section-despesa').classList.add('active');
-    }
+    // 2. Alterna os formulários (Remove active de todos e coloca no selecionado)
+    document.querySelectorAll('.form-section').forEach(section => {
+        section.classList.remove('active');
+    });
+    document.getElementById(`section-${tipo}`).classList.add('active');
+
+    // 3. Atualiza as datas
+    setDefaultDates();
 }
 
 function init() {

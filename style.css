@@ -583,67 +583,83 @@
             display: block; 
         }
 
-        /* --- COMPORTAMENTO PADRÃO (PC/DESKTOP) --- */
-        .mobile-tabs { display: none; } /* Esconde abas no PC */
+        /* --- LAYOUT DE ABAS UNIFICADO E ALINHADO --- */
+/* --- LAYOUT DE ABAS UNIFICADO (PC E CELULAR) --- */
 
-        /* No PC, força os dois formulários a ficarem visíveis */
-        #section-venda, #section-despesa {
+        /* 1. O Container das abas */
+        .mobile-tabs {
+            display: grid !important; 
+            grid-template-columns: 1fr 1fr;
+            background: #f1f5f9;
+            width: 100%; /* Ocupa a largura total para alinhar com o menu */
+            margin: 0;
+            padding: 0;
+            border-top-left-radius: var(--radius);
+            border-top-right-radius: var(--radius);
+            border: 1px solid var(--line);
+            border-bottom: none;
+            overflow: hidden;
+        }
+
+        /* 2. Os botões das abas */
+        .tab-item {
+            padding: 18px;
+            border: none;
+            background: #f8fafc;
+            color: var(--muted);
+            font-weight: 800;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            transition: 0.3s;
+            text-transform: uppercase;
+            font-size: 14px;
+        }
+
+        /* Cores Cristal (Venda: Verde / Despesa: Vermelho) */
+        .tab-venda.active {
+            background: #ecfdf5 !important;
+            color: var(--green) !important;
+            border-bottom: 4px solid var(--green);
+        }
+
+        .tab-despesa.active {
+            background: #fef2f2 !important;
+            color: var(--red) !important;
+            border-bottom: 4px solid var(--red);
+        }
+
+        /* 3. A MÁGICA PARA ESCONDER O FORMULÁRIO INATIVO */
+        /* Esconde todas as seções financeiras por padrão (PC e Mobile) */
+        .form-section {
+            display: none !important; 
+            width: 100%;
+        }
+
+        /* Mostra APENAS a que tiver a classe 'active' */
+        .form-section.active {
             display: block !important;
         }
 
-        /* --- COMPORTAMENTO MOBILE (CELULAR) --- */
-        @media (max-width: 600px) {
-            .mobile-tabs {
-                display: grid;
-                grid-template-columns: 1fr 1fr;
-                background: #f1f5f9;
-                margin: 10px 0 0 0;
-                border-radius: 12px 12px 0 0;
-                border: 1px solid var(--line);
-                border-bottom: none;
-                overflow: hidden;
-            }
-
-            .tab-item {
-                padding: 14px;
-                border: none;
-                background: #f8fafc;
-                color: var(--muted);
-                font-weight: bold;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                gap: 8px;
-            }
-
-            /* Cores Cristal Ativas */
-            .tab-venda.active {
-                background: #ecfdf5 !important; /* Verde Cristal */
-                color: var(--green) !important;
-                border-bottom: 4px solid var(--green);
-            }
-
-            .tab-despesa.active {
-                background: #fef2f2 !important; /* Vermelho Cristal */
-                color: var(--red) !important;
-                border-bottom: 4px solid var(--red);
-            }
-
-            /* Esconde o formulário inativo no celular */
-            .form-section { display: none !important; }
-            .form-section.active { display: block !important; }
-
-            /* Ajuste para colar o card na aba */
-            .form-section .card {
-                border-top-left-radius: 0 !important;
-                border-top-right-radius: 0 !important;
-                margin-top: 0 !important;
-                border-top: none !important;
-            }
-
-            .desktop-only { display: none !important; }
-            .grid-2.financeiro-container { display: block !important; }
+        /* 4. Ajuste do Card para colar na aba e ocupar largura total */
+        .form-section .card {
+            border-top-left-radius: 0 !important;
+            border-top-right-radius: 0 !important;
+            border-top: none !important;
+            margin-top: 0 !important;
+            width: 100% !important;
+            box-shadow: var(--shadow);
         }
 
-        /* Estilo do ícone SVG */
-        .tab-icon svg { vertical-align: middle; }
+        /* Remove títulos antigos que poluem o visual */
+        #desktopHeader, .card-header.desktop-only {
+            display: none !important;
+        }
+
+        /* Força o container pai a não usar grid de duas colunas no PC */
+        .financeiro-container {
+            display: block !important;
+            width: 100%;
+        }

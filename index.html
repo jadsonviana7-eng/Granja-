@@ -43,160 +43,156 @@
     <nav class="tabs" id="topTabs"></nav>
 
     <section id="page-venda" class="page active">
-    <div class="mobile-tabs">
-        <button type="button" class="tab-item tab-venda active" onclick="switchForm('venda')">
-            <span class="tab-icon">
-                <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2.5" fill="none"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
-            </span>
-            Vendas
-        </button>
-        <button type="button" class="tab-item tab-despesa" onclick="switchForm('despesa')">
-            <span class="tab-icon">
-                <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2.5" fill="none"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline><polyline points="17 6 23 6 23 12"></polyline></svg>
-            </span>
-            Despesas
-        </button>
-            </div>
+        <div class="mobile-tabs">
+            <button type="button" class="tab-item tab-venda active" onclick="switchForm('venda')">
+                <span class="tab-icon">
+                    <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2.5" fill="none"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
+                </span>
+                Vendas
+            </button>
+            <button type="button" class="tab-item tab-despesa" onclick="switchForm('despesa')">
+                <span class="tab-icon">
+                    <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2.5" fill="none"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline><polyline points="17 6 23 6 23 12"></polyline></svg>
+                </span>
+                Despesas
+            </button>
+        </div>
 
-            <div class="grid-2 financeiro-container">
-        <div id="section-venda" class="form-section active">
-            <form class="card shadow" id="saleForm">
-                <div class="card-header desktop-only"><h2>Nova Venda</h2></div>
-                        <div style="padding: 15px;">
-                            <div class="grid-2">
-                                <div class="field">
-                                    <label>Data</label>
-                                    <input type="date" id="saleDate" required>
-                                </div>
-                                <div class="field">
-                                    <label>Cliente</label>
-                                    <select id="saleClient" required></select>
-                                </div>
+        <div class="financeiro-container">
+            <div id="section-venda" class="form-section active">
+                <form class="card shadow" id="saleForm">
+                    <div style="padding: 20px;">
+                        <div class="grid-2">
+                            <div class="field">
+                                <label>Data</label>
+                                <input type="date" id="saleDate" required>
                             </div>
-
-                            <div class="grid-2">
-                                <div class="field">
-                                    <label>Produto</label>
-                                    <select id="saleProduct" onchange="updateProductPrice()" required>
-                                        <option value="">Selecione um produto...</option>
-                                    </select>
-                                </div>
-                                <div class="field">
-                                    <label>Quantidade</label>
-                                    <input type="number" id="saleQty" step="1" value="1" oninput="calculateSaleTotal()" required>
-                                </div>
+                            <div class="field">
+                                <label>Cliente</label>
+                                <select id="saleClient" required></select>
                             </div>
-
-                            <div class="grid-3" style="background: var(--surface-2); padding: 10px; border-radius: 8px; margin-top: 10px;">
-                                <div class="field">
-                                    <label>V. Unitário (R$)</label>
-                                    <input type="number" id="saleUnitValue" step="0.01" oninput="calculateSaleTotal()">
-                                </div>
-                                <div class="field">
-                                    <label>Desconto (R$)</label>
-                                    <input type="number" id="saleDiscount" step="0.01" value="0.00" oninput="calculateSaleTotal()">
-                                </div>
-                                <div class="field">
-                                    <label>Total Final</label>
-                                    <input type="number" id="saleTotal" step="0.01" style="background: #eef2ff; color: var(--blue); font-weight: 800;" readonly>
-                                </div>
-                            </div>
-
-                            <div class="grid-2" style="margin-top: 15px;">
-                                <div class="field">
-                                    <label>Status do Pagamento</label>
-                                    <select id="saleStatus">
-                                        <option value="pago">Pago</option>
-                                        <option value="pendente">Pendente (Fiado)</option>
-                                    </select>
-                                </div>
-                                <div class="field">
-                                    <label>Observações</label>
-                                    <input type="text" id="saleObs" placeholder="Ex: Pix, Dinheiro...">
-                                </div>
-                            </div>
-                            <button type="submit" class="btn primary full mt-1">Registrar Venda</button>
                         </div>
-                    </form>
-                </div>
 
-                <div class="grid-2 financeiro-container">
-                <div id="section-venda" class="form-section active">
-                    <form class="card shadow" id="saleForm">
-                        <div class="card-header desktop-only"><h2>Nova Venda</h2></div>
-                        <div style="padding: 15px;">
+                        <div class="grid-2">
                             <div class="field">
-                                <label>Data da Compra</label>
-                                <input type="date" id="expenseDate" required>
-                            </div>
-                            
-                            <div class="field">
-                                <label>Tipo de Lançamento</label>
-                                <select id="expenseMode" onchange="updateExpenseInsumoFields()">
-                                    <option value="FINANCEIRO">Apenas despesa financeira</option>
-                                    <option value="ESTOQUE">Despesa com entrada no estoque</option>
+                                <label>Produto</label>
+                                <select id="saleProduct" onchange="updateProductPrice()" required>
+                                    <option value="">Selecione um produto...</option>
                                 </select>
                             </div>
-
-                            <div class="field" id="expenseInsumoField">
-                                <label>Insumo comprado</label>
-                                <select id="expenseInsumo" onchange="updateExpenseInsumoFields()"></select>
-                                <small id="expenseStockInfo" class="hint-text">Selecione um insumo para atualizar o estoque.</small>
-                            </div>
-
                             <div class="field">
-                                <label>Descrição</label>
-                                <input id="expenseDesc" type="text" placeholder="Ex: Milho, Energia, etc">
+                                <label>Quantidade</label>
+                                <input type="number" id="saleQty" step="1" value="1" oninput="calculateSaleTotal()" required>
                             </div>
-                            
-                            <div class="grid-3" style="background: var(--surface-2); padding: 10px; border-radius: 8px;">
-                                <div class="field">
-                                    <label id="expenseQtyLabel">Qtd</label>
-                                    <input id="expenseQty" type="number" value="1" min="0" step="0.01" oninput="calculateExpenseTotal()">
-                                </div>
-                                <div class="field">
-                                    <label>V. Unitário (R$)</label>
-                                    <input id="expenseUnitValue" type="number" step="0.01" oninput="calculateExpenseTotal()">
-                                </div>
-                                <div class="field">
-                                    <label>Total (R$)</label>
-                                    <input id="expenseValue" type="number" step="0.01" readonly style="background: #fee2e2; color: var(--red); font-weight: 800;">
-                                </div>
-                            </div>
+                        </div>
 
-                            <div class="field" style="margin-top: 15px;">
-                                <label>Forma de Pagamento</label>
-                                <select id="expensePaymentMethod" onchange="toggleExpenseInstallments()">
-                                    <option value="Pix">Pix</option>
-                                    <option value="Dinheiro">Dinheiro</option>
-                                    <option value="Cartão de Crédito">Cartão de Crédito</option>
+                        <div class="grid-3" style="background: var(--surface-2); padding: 10px; border-radius: 8px; margin-top: 10px;">
+                            <div class="field">
+                                <label>V. Unitário (R$)</label>
+                                <input type="number" id="saleUnitValue" step="0.01" oninput="calculateSaleTotal()">
+                            </div>
+                            <div class="field">
+                                <label>Desconto (R$)</label>
+                                <input type="number" id="saleDiscount" step="0.01" value="0.00" oninput="calculateSaleTotal()">
+                            </div>
+                            <div class="field">
+                                <label>Total Final</label>
+                                <input type="number" id="saleTotal" step="0.01" style="background: #eef2ff; color: var(--blue); font-weight: 800;" readonly>
+                            </div>
+                        </div>
+
+                        <div class="grid-2" style="margin-top: 15px;">
+                            <div class="field">
+                                <label>Status do Pagamento</label>
+                                <select id="saleStatus">
+                                    <option value="pago">Pago</option>
+                                    <option value="pendente">Pendente (Fiado)</option>
                                 </select>
                             </div>
+                            <div class="field">
+                                <label>Observações</label>
+                                <input type="text" id="saleObs" placeholder="Ex: Pix, Dinheiro...">
+                            </div>
+                        </div>
+                        <button type="submit" class="btn primary full mt-1">Registrar Venda</button>
+                    </div>
+                </form>
+            </div>
 
-                            <div id="expenseInstallmentSection" style="display: none; background: #f8fafc; padding: 15px; border-radius: 8px; border: 1px solid var(--line);">
-                                <div class="grid-2">
-                                    <div class="field">
-                                        <label>Nº de Parcelas</label>
-                                        <input id="expenseInstallments" type="number" value="1" min="1" oninput="calculateExpenseTotal()">
-                                    </div>
-                                    <div class="field">
-                                        <label>Dia de Vencimento</label>
-                                        <input id="expenseDueDay" type="number" placeholder="Ex: 10" min="1" max="31">
-                                    </div>
+            <div id="section-despesa" class="form-section">
+                <form class="card shadow" id="expenseForm">
+                    <div style="padding: 20px;">
+                        <div class="field">
+                            <label>Data da Compra</label>
+                            <input type="date" id="expenseDate" required>
+                        </div>
+                        
+                        <div class="field">
+                            <label>Tipo de Lançamento</label>
+                            <select id="expenseMode" onchange="updateExpenseInsumoFields()">
+                                <option value="FINANCEIRO">Apenas despesa financeira</option>
+                                <option value="ESTOQUE">Despesa com entrada no estoque</option>
+                            </select>
+                        </div>
+
+                        <div class="field" id="expenseInsumoField">
+                            <label>Insumo comprado</label>
+                            <select id="expenseInsumo" onchange="updateExpenseInsumoFields()"></select>
+                            <small id="expenseStockInfo" class="hint-text">Selecione um insumo.</small>
+                        </div>
+
+                        <div class="field">
+                            <label>Descrição</label>
+                            <input id="expenseDesc" type="text" placeholder="Ex: Milho, Energia, etc">
+                        </div>
+                        
+                        <div class="grid-3" style="background: var(--surface-2); padding: 10px; border-radius: 8px;">
+                            <div class="field">
+                                <label id="expenseQtyLabel">Qtd</label>
+                                <input id="expenseQty" type="number" value="1" min="0" step="0.01" oninput="calculateExpenseTotal()">
+                            </div>
+                            <div class="field">
+                                <label>V. Unitário (R$)</label>
+                                <input id="expenseUnitValue" type="number" step="0.01" oninput="calculateExpenseTotal()">
+                            </div>
+                            <div class="field">
+                                <label>Total (R$)</label>
+                                <input id="expenseValue" type="number" step="0.01" readonly style="background: #fee2e2; color: var(--red); font-weight: 800;">
+                            </div>
+                        </div>
+
+                        <div class="field" style="margin-top: 15px;">
+                            <label>Forma de Pagamento</label>
+                            <select id="expensePaymentMethod" onchange="toggleExpenseInstallments()">
+                                <option value="Pix">Pix</option>
+                                <option value="Dinheiro">Dinheiro</option>
+                                <option value="Cartão de Crédito">Cartão de Crédito</option>
+                            </select>
+                        </div>
+
+                        <div id="expenseInstallmentSection" style="display: none; background: #f8fafc; padding: 15px; border-radius: 8px; border: 1px solid var(--line);">
+                            <div class="grid-2">
+                                <div class="field">
+                                    <label>Nº de Parcelas</label>
+                                    <input id="expenseInstallments" type="number" value="1" min="1" oninput="calculateExpenseTotal()">
                                 </div>
                                 <div class="field">
-                                    <label>Valor da Parcela (R$)</label>
-                                    <input id="expenseInstallmentValue" type="text" readonly style="background: #e2e8f0; font-weight: bold;">
+                                    <label>Dia de Vencimento</label>
+                                    <input id="expenseDueDay" type="number" placeholder="Ex: 10" min="1" max="31">
                                 </div>
                             </div>
-                            
-                            <button class="btn red full" type="submit" style="margin-top: 15px;">Salvar Despesa</button>
+                            <div class="field">
+                                <label>Valor da Parcela (R$)</label>
+                                <input id="expenseInstallmentValue" type="text" readonly style="background: #e2e8f0; font-weight: bold;">
+                            </div>
                         </div>
-                    </form>
-                </div>
-
+                        
+                        <button class="btn red full" type="submit" style="margin-top: 15px;">Salvar Despesa</button>
+                    </div>
+                </form>
             </div>
-        </section>
+        </div>
+    </section>
 
     <section id="page-producao" class="page">
         <div class="grid-2">
