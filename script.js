@@ -34,7 +34,15 @@ function loadDb() {
         data = {};
     }
 
+    return normalizeDatabase(data);
+}
+
+function normalizeDatabase(data) {
+    data = data || {};
     data.estoque = data.estoque || { Grande: 0, Medio: 0, Pequeno: 0 };
+    data.estoque.Grande = Number(data.estoque.Grande) || 0;
+    data.estoque.Medio = Number(data.estoque.Medio) || 0;
+    data.estoque.Pequeno = Number(data.estoque.Pequeno) || 0;
     data.insumos = Array.isArray(data.insumos) ? data.insumos : [];
     data.clientes = Array.isArray(data.clientes) ? data.clientes : [];
     data.produtos = Array.isArray(data.produtos) ? data.produtos : [];
@@ -45,6 +53,8 @@ function loadDb() {
 
     data.insumos = data.insumos.map(normalizeInsumo);
     data.produtos = data.produtos.map(normalizeProduto);
+    data.coletas = data.coletas.map(normalizeColeta);
+    data.historico = data.historico.map(normalizeHistorico);
 
     return data;
 }
@@ -89,6 +99,32 @@ function normalizeEggType(tipo) {
 }
 
 // Função principal de salvamento (Local + Nuvem)
+function normalizeColeta(coleta) {
+    const bruto = Number(coleta.bruto ?? coleta.coletados ?? coleta.coletado ?? 0) || 0;
+    const perda = Number(coleta.perda ?? coleta.perdas ?? 0) || 0;
+    const liquido = Number(coleta.liquido ?? (bruto - perda)) || 0;
+
+    return {
+        ...coleta,
+        id: coleta.id || Date.now() + Math.random(),
+        data: dateToISO(coleta.data) || today,
+        tipo: normalizeEggType(coleta.tipo || "Grande"),
+        bruto,
+        perda,
+        liquido
+    };
+}
+
+function normalizeHistorico(item) {
+    return {
+        ...item,
+        id: item.id || Date.now() + Math.random(),
+        data: dateToISO(item.data) || today,
+        valor: Number(item.valor) || 0,
+        qtd: Number(item.qtd ?? item.quantidade ?? 0) || 0
+    };
+}
+
 function save() {
     // 1. Salva no localStorage (Segurança local)
     localStorage.setItem(STORE_KEY, JSON.stringify(db));
@@ -97,7 +133,6 @@ function save() {
     render();
 
     // 3. Envia para o Google Sheets (Sincronização na Nuvem)
-    syncToCloud();
 }
 
 function esc(str) {
@@ -298,8 +333,15 @@ function renderClients() {
     if (!list) return;
     list.innerHTML = db.clientes.map(c => `
         <div class="item">
-            <div><b>${esc(c.nome)}</b><small>${esc([c.telefone, c.cidade].filter(Boolean).join(" · "))}</small></div>
-            <button class="icon-btn danger" type="button" onclick="deleteItem('clientes', ${c.id})" title="Excluir cliente" aria-label="Excluir cliente">${deleteIcon()}</button>
+            <div style="display: flex; flex-direction: column; align-items: flex-start;">
+                <b style="font-size: 1.1rem;">${esc(c.nome)}</b>
+                <small style="color: var(--muted); margin-top: 2px;">
+                    ${esc([c.telefone, c.cidade].filter(Boolean).join(" · "))}
+                </small>
+            </div>
+            <button class="icon-btn danger" type="button" onclick="deleteItem('clientes', ${c.id})" title="Excluir cliente" aria-label="Excluir cliente">
+                ${deleteIcon()}
+            </button>
         </div>
     `).join("");
 }
@@ -309,8 +351,15 @@ function renderProducts() {
     if (!list) return;
     list.innerHTML = db.produtos.map(p => `
         <div class="item">
-            <div><b>${esc(p.nome)}</b><small>${esc(p.tipoOvo)} · ${p.ovosPorItem || 0} ovos · ${money(p.preco)}</small></div>
-            <button class="icon-btn danger" type="button" onclick="deleteItem('produtos', ${p.id})" title="Excluir produto" aria-label="Excluir produto">${deleteIcon()}</button>
+            <div style="display: flex; flex-direction: column; align-items: flex-start;">
+                <b style="font-size: 1.1rem;">${esc(p.nome)}</b>
+                <small style="color: var(--muted); margin-top: 2px;">
+                    ${esc(p.tipoOvo)} · ${p.ovosPorItem || 0} ovos · ${money(p.preco)}
+                </small>
+            </div>
+            <button class="icon-btn danger" type="button" onclick="deleteItem('produtos', ${p.id})" title="Excluir produto" aria-label="Excluir produto">
+                ${deleteIcon()}
+            </button>
         </div>
     `).join("");
 }
@@ -320,11 +369,16 @@ function renderInsumos() {
     if (!list) return;
     list.innerHTML = db.insumos.map(ins => `
         <div class="item">
-            <div>
-                <b>${esc(ins.nome)}</b>
-                <small>${isRacao(ins) ? `Ração ${esc(getPhaseLabel(ins.tipoConsumo))}` : "Insumo geral"} · ${formatNumber(ins.qtd)} ${getInsumoUnit(ins)}</small>
+            <div style="display: flex; flex-direction: column; align-items: flex-start;">
+                <b style="font-size: 1.1rem;">${esc(ins.nome)}</b>
+                <small style="color: var(--muted); margin-top: 2px;">
+                    ${isRacao(ins) ? `Ração ${esc(getPhaseLabel(ins.tipoConsumo))}` : "Insumo geral"} · 
+                    ${formatNumber(ins.qtd)} ${getInsumoUnit(ins)}
+                </small>
             </div>
-            <button class="icon-btn danger" type="button" onclick="deleteItem('insumos', ${ins.id})" title="Excluir insumo" aria-label="Excluir insumo">${deleteIcon()}</button>
+            <button class="icon-btn danger" type="button" onclick="deleteItem('insumos', ${ins.id})" title="Excluir insumo" aria-label="Excluir insumo">
+                ${deleteIcon()}
+            </button>
         </div>
     `).join("");
 }
@@ -389,49 +443,57 @@ function renderExtract() {
 }
 
 function renderColetas() {
-    const lista = document.getElementById("listaColetasDiarias");
+    const lista = document.getElementById("coletaList");
     const filtroData = document.getElementById("filtroDataColeta");
     if (!lista) return;
 
     let mesFiltro, anoFiltro;
 
     if (filtroData && filtroData.value) {
-        // Se o usuário escolheu uma data no input type="month" (YYYY-MM)
         const partes = filtroData.value.split("-");
         anoFiltro = parseInt(partes[0]);
         mesFiltro = parseInt(partes[1]) - 1;
     } else {
-        // Padrão: Mês atual
         const agora = new Date();
         mesFiltro = agora.getMonth();
         anoFiltro = agora.getFullYear();
-        // Define o valor do input para o mês atual visualmente
         if (filtroData) filtroData.value = `${anoFiltro}-${String(mesFiltro + 1).padStart(2, '0')}`;
     }
 
-    const coletasFiltradas = db.coletas.filter(coleta => {
-        const d = new Date(coleta.data + "T12:00:00");
-        return d.getMonth() === mesFiltro && d.getFullYear() === anoFiltro;
-    });
+    const coletasFiltradas = db.coletas
+        .filter(coleta => {
+            const iso = dateToISO(coleta.data);
+            if (!iso) return false;
+            const [ano, mes] = iso.split("-").map(Number);
+            return ano === anoFiltro && mes === (mesFiltro + 1);
+        })
+        .sort((a, b) => dateToISO(b.data).localeCompare(dateToISO(a.data)));
 
     let html = "";
-    if (coletasMesVigente.length === 0) {
+    if (coletasFiltradas.length === 0) {
         html = '<div style="text-align:center; padding:20px; color:var(--muted);">Nenhuma coleta registrada neste mês.</div>';
     } else {
-        coletasMesVigente.forEach(item => {
+        coletasFiltradas.forEach(item => {
             html += `
-                <div class="item-lista">
-                    <div class="item-info">
-                        <b>${formatDate(item.data)}</b> - ${item.tipo}
-                        <span>${item.liquido} ovos</span>
+                <div class="item">
+                    <div style="display: flex; flex-direction: column; align-items: flex-start;">
+                        <span style="font-size: 0.75rem; color: var(--muted); font-weight: bold; text-transform: uppercase;">
+                            ${formatarDataBR(item.data)}
+                        </span>
+                        <b style="font-size: 1.05rem; color: var(--ink); margin: 2px 0;">
+                            Ovos ${esc(item.tipo)}
+                        </b>
+                        <small style="color: var(--muted); font-size: 0.85rem;">
+                            <strong>${item.liquido} ovos líquidos</strong> · ${item.bruto} coletados · ${item.perda} perdas
+                        </small>
                     </div>
-                    <button class="btn-icon red" onclick="deleteItem('coletas', ${item.id})">
-                        <i class="fas fa-trash"></i>
+                    
+                    <button class="icon-btn danger" type="button" onclick="deleteItem('coletas', ${item.id})" title="Excluir coleta">
+                        ${deleteIcon()}
                     </button>
                 </div>`;
         });
     }
-
     lista.innerHTML = html;
 }
 
@@ -679,6 +741,9 @@ function handleExpense(e) {
         vencimentoDia: document.getElementById("expenseDueDay")?.value || "",
         status: "pago"
     });
+
+    document.getElementById("expenseDesc").value = "";
+    document.getElementById("expenseValue").value = "";
 
     save();
     e.target.reset();
@@ -1056,23 +1121,161 @@ async function syncToCloud() {
     }
 }
 
+// Função para buscar TUDO da nuvem
 async function loadFromCloud() {
-    if (!confirm("Substituir dados locais pelos da nuvem?")) return;
-    atualizarBarra(20, "Conectando...");
+    if (!CLOUD_URL) return;
+    
+    // Chama a função de barra no início
+    atualizarBarra(true, "Buscando dados na nuvem...");
+
     try {
-        const response = await fetch(`${CLOUD_URL}?t=${Date.now()}`, { redirect: "follow" });
-        atualizarBarra(60, "Baixando banco de dados...");
-        const data = await response.json();
-        localStorage.setItem(STORE_KEY, JSON.stringify(data));
-        db = loadDb();
-        save();
-        atualizarBarra(100, "Dados restaurados!");
-        toast("Dados carregados!");
-    } catch (e) {
-        console.error(e);
-        atualizarBarra(0, "Falha no download");
-        toast("Erro ao carregar da nuvem.");
+        // Importante: Adicionamos cache: "no-store" para garantir dados novos
+        const response = await fetch(CLOUD_URL, { 
+            method: 'GET',
+            mode: 'cors', // Tenta usar CORS primeiro
+            cache: 'no-store'
+        });
+
+        if (!response.ok) throw new Error("Falha na conexão");
+
+        const cloudData = await response.json();
+        
+        if (cloudData && typeof cloudData === 'object') {
+            // Se a nuvem retornar um objeto válido
+            db = cloudData;
+            localStorage.setItem(STORE_KEY, JSON.stringify(db));
+            
+            render();
+            atualizarBarra(false); // Fecha a barra com sucesso
+            toast("✅ Sincronizado com sucesso!");
+        }
+    } catch (error) {
+        console.error("Erro ao carregar:", error);
+        atualizarBarra(false); // Fecha a barra mesmo em erro
+        toast("⚠️ Usando dados locais offline.");
     }
+}
+
+function createCloudPayload() {
+    const banco = normalizeDatabase(JSON.parse(JSON.stringify(db)));
+    const estoqueInsumos = banco.insumos.map(i => ({
+        item: i.nome,
+        grupo: i.tipoConsumo === "GERAL" ? "Insumo geral" : `Ração ${getPhaseLabel(i.tipoConsumo)}`,
+        quantidade: i.qtd,
+        unidade: i.unidade || getInsumoUnit(i)
+    }));
+    const estoqueOvos = Object.keys(banco.estoque).map(tipo => ({
+        item: `Ovo ${tipo}`,
+        grupo: "Ovos",
+        quantidade: banco.estoque[tipo],
+        unidade: "un"
+    }));
+
+    return {
+        schemaVersion: 3,
+        app: "granja-rancho-do-viana",
+        updatedAt: new Date().toISOString(),
+        ...banco,
+        backupCompleto: banco,
+        organizado: {
+            estoque_geral: [...estoqueOvos, ...estoqueInsumos],
+            producao: banco.coletas,
+            extrato: banco.historico,
+            plantel: banco.config.plantel,
+            cadastros: {
+                clientes: banco.clientes,
+                produtos: banco.produtos,
+                insumos: banco.insumos
+            }
+        }
+    };
+}
+
+async function syncToCloud() {
+    if (!CLOUD_URL) return;
+
+    atualizarBarra(10, "Preparando backup completo...");
+
+    try {
+        atualizarBarra(45, "Enviando dados para a nuvem...");
+        await fetch(CLOUD_URL, {
+            method: "POST",
+            mode: "no-cors",
+            headers: { "Content-Type": "text/plain;charset=utf-8" },
+            body: JSON.stringify(createCloudPayload())
+        });
+        atualizarBarra(100, "Backup enviado!");
+        toast("Dados salvos na nuvem.");
+    } catch (error) {
+        console.error("Erro na sincronização:", error);
+        atualizarBarra(0, "Falha no envio");
+        toast("Erro ao salvar na nuvem.");
+    }
+}
+
+async function loadFromCloud() {
+    if (!CLOUD_URL) return;
+
+    atualizarBarra(15, "Buscando dados na nuvem...");
+
+    try {
+        atualizarBarra(45, "Baixando backup...");
+        const response = await fetch(`${CLOUD_URL}?t=${Date.now()}`, {
+            method: "GET",
+            cache: "no-store"
+        });
+
+        if (!response.ok) throw new Error("Falha na conexão");
+
+        const cloudData = await response.json();
+        db = normalizeDatabase(extractDatabaseFromCloud(cloudData));
+        localStorage.setItem(STORE_KEY, JSON.stringify(db));
+        render();
+        setDefaultDates();
+        atualizarBarra(100, "Dados restaurados!");
+        toast("Dados carregados da nuvem.");
+    } catch (error) {
+        console.error("Erro ao carregar:", error);
+        atualizarBarra(0, "Falha ao carregar");
+        toast("Não foi possível carregar da nuvem. Dados locais mantidos.");
+    }
+}
+
+function extractDatabaseFromCloud(cloudData) {
+    if (!cloudData || typeof cloudData !== "object") {
+        throw new Error("Resposta da nuvem vazia ou inválida");
+    }
+
+    const source = cloudData.backupCompleto || cloudData.database || cloudData.db || cloudData.data || cloudData;
+    const data = source.data && !source.coletas && !source.historico ? source.data : source;
+
+    return {
+        estoque: data.estoque || rebuildEggStock(data.estoque_geral || data.organizado?.estoque_geral),
+        insumos: data.insumos || data.cadastros?.insumos || data.organizado?.cadastros?.insumos || [],
+        clientes: data.clientes || data.cadastros?.clientes || data.organizado?.cadastros?.clientes || [],
+        produtos: data.produtos || data.cadastros?.produtos || data.organizado?.cadastros?.produtos || [],
+        historico: data.historico || data.extrato || data.organizado?.extrato || [],
+        coletas: data.coletas || data.producao || data.organizado?.producao || [],
+        config: {
+            ...(data.config || {}),
+            plantel: data.config?.plantel || data.plantel || data.organizado?.plantel || {}
+        }
+    };
+}
+
+function rebuildEggStock(estoqueGeral) {
+    const estoque = { Grande: 0, Medio: 0, Pequeno: 0 };
+    if (!Array.isArray(estoqueGeral)) return estoque;
+
+    estoqueGeral.forEach(item => {
+        const nome = String(item.item || item.nome || "").toLowerCase();
+        const quantidade = Number(item.quantidade ?? item.qtd ?? 0) || 0;
+        if (nome.includes("grande")) estoque.Grande = quantidade;
+        if (nome.includes("medio") || nome.includes("médio")) estoque.Medio = quantidade;
+        if (nome.includes("pequeno")) estoque.Pequeno = quantidade;
+    });
+
+    return estoque;
 }
 
 function resetApp() {
@@ -1090,12 +1293,17 @@ function setDefaultDates() {
     const expenseDate = document.getElementById("expenseDate");
     const start = document.getElementById("filterStart");
     const end = document.getElementById("filterEnd");
+    const coletaMonth = document.getElementById("filtroDataColeta");
 
-    if (saleDate && !saleDate.value) saleDate.value = today;
-    if (prodDate && !prodDate.value) prodDate.value = today;
-    if (expenseDate && !expenseDate.value) expenseDate.value = today;
+    // Removemos o "!value" destes campos para FORÇAR a data de hoje ao abrir o app
+    if (saleDate) saleDate.value = today;
+    if (prodDate) prodDate.value = today;
+    if (expenseDate) expenseDate.value = today; // Agora vai funcionar!
+
+    // Filtros: mantemos a trava para não sobrescrever uma busca do usuário
     if (start && !start.value) start.value = `${today.slice(0, 8)}01`;
     if (end && !end.value) end.value = today;
+    if (coletaMonth && !coletaMonth.value) coletaMonth.value = today.slice(0, 7);
 }
 
 function bindForms() {
@@ -1110,6 +1318,20 @@ function bindForms() {
     ["filterStart", "filterEnd", "filterType"].forEach(id => {
         document.getElementById(id)?.addEventListener("input", renderExtract);
     });
+    document.getElementById("filtroDataColeta")?.addEventListener("input", renderColetas);
+}
+
+function switchForm(tipo) {
+    document.querySelectorAll('.tab-item').forEach(b => b.classList.remove('active'));
+    event.currentTarget.classList.add('active');
+
+    if (tipo === 'venda') {
+        document.getElementById('section-venda').classList.add('active');
+        document.getElementById('section-despesa').classList.remove('active');
+    } else {
+        document.getElementById('section-venda').classList.remove('active');
+        document.getElementById('section-despesa').classList.add('active');
+    }
 }
 
 function init() {

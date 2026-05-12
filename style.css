@@ -572,3 +572,43 @@
             background: #cbd5e1;
             border-radius: 10px;
         }
+
+        /* --- CONFIGURAÇÃO PARA DESKTOP (PC) --- */
+.mobile-tabs { 
+    display: none; /* Esconde as abas no PC */
+}
+
+/* Garante que no PC as seções apareçam (Lado a lado se estiverem na grid-2) */
+.form-section { 
+    display: block; 
+}
+
+/* --- CONFIGURAÇÃO PARA CELULAR (MOBILE) --- */
+@media (max-width: 600px) {
+    .mobile-tabs { 
+        display: grid; 
+        grid-template-columns: 1fr 1fr; 
+        margin-bottom: 10px;
+    }
+    
+    .desktop-only { 
+        display: none; 
+    } 
+
+    /* Aqui sim, no mobile, escondemos por padrão e mostramos só a ativa */
+    .form-section { 
+        display: none; 
+    }
+    
+    .form-section.active { 
+        display: block !important; 
+    }
+
+    .grid-2.financeiro-container { 
+        display: block; /* Empilha os cards no celular */
+    }
+    
+    #desktopHeader {
+        display: none; /* Ganha espaço no celular */
+    }
+}
