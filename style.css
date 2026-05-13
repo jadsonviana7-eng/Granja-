@@ -664,19 +664,38 @@
             width: 100%;
         }
 
-        /* Estilos para ocultar/exibir o Stock Panel no celular */
         @media (max-width: 768px) {
-            .stock-panel {
-                transition: all 0.3s ease;
-                cursor: pointer;
-                overflow: hidden;
-            }
-
-            /* Estado oculto: fica apenas uma "faixa" fina e discreta */
-            .stock-panel.is-hidden {
-                height: 10px;
-                opacity: 0.3;
-                background: var(--muted);
-                margin-bottom: 5px;
-            }
+        .stock-panel {
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            cursor: pointer;
+            position: relative;
         }
+
+        /* Quando oculto, vira uma pequena pílula centralizada */
+        .stock-panel.is-hidden {
+            height: 32px;
+            background: var(--surface-2);
+            border: 1px solid var(--line);
+            margin: 10px auto;
+            width: 60%; /* Fica menorzinho no centro */
+            border-radius: 20px;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+        }
+
+        /* Esconde o conteúdo real quando oculto */
+        .stock-panel.is-hidden > * {
+            display: none;
+        }
+
+        /* Adiciona um texto ou ícone via CSS quando oculto */
+        .stock-panel.is-hidden::after {
+            content: "📊 Ver Estoque";
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--muted);
+        }
+    }
