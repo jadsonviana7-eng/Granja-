@@ -1152,19 +1152,28 @@ async function syncToCloud() {
     atualizarBarra(10, "Preparando backup completo...");
 
     try {
-        atualizarBarra(45, "Enviando dados para a nuvem...");
-        await fetch(CLOUD_URL, {
+        const payload = createCloudPayload(); // Sua função que gera o JSON complexo
+        
+        atualizarBarra(40, "Enviando dados estruturados...");
+
+        const response = await fetch(CLOUD_URL, {
             method: "POST",
-            mode: "no-cors",
-            headers: { "Content-Type": "text/plain;charset=utf-8" },
-            body: JSON.stringify(createCloudPayload())
+            mode: "no-cors", // Necessário para evitar erros de CORS no Google Apps Script
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                action: "syncFull",
+                data: payload
+            })
         });
-        atualizarBarra(100, "Backup enviado!");
-        toast("Dados salvos na nuvem.");
+
+        atualizarBarra(100, "Sincronização concluída!");
+        toast("✅ Backup completo salvo na planilha.");
     } catch (error) {
-        console.error("Erro na sincronização:", error);
-        atualizarBarra(0, "Falha no envio");
-        toast("Erro ao salvar na nuvem.");
+        console.error("Erro crítico na sincronização:", error);
+        atualizarBarra(0, "Falha no backup");
+        toast("❌ Erro ao salvar na nuvem.");
     }
 }
 
