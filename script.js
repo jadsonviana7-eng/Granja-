@@ -412,17 +412,33 @@ function renderExtract() {
     const end = document.getElementById("filterEnd")?.value || "";
     const type = document.getElementById("filterType")?.value || "TODOS";
 
-    const filtrado = db.historico.filter(item => {
+    // 1. Filtramos os dados normalmente
+    let filtrado = db.historico.filter(item => {
         const itemDataISO = dateToISO(item.data);
         const matchDate = (!start || itemDataISO >= start) && (!end || itemDataISO <= end);
         const matchType = type === "TODOS" || item.tipo === type;
         return matchDate && matchType && (item.tipo === "VENDA" || item.tipo === "SAIDA");
     });
 
+    // 2. ORDENAÇÃO: Da data mais recente para a mais antiga
+    // Usamos o localeCompare ou comparação de strings ISO para garantir a ordem correta
+    filtrado.sort((a, b) => {
+        const dateA = dateToISO(a.data);
+        const dateB = dateToISO(b.data);
+        
+        // Se as datas forem diferentes, ordena pela data (descendente)
+        if (dateB !== dateA) {
+            return dateB.localeCompare(dateA);
+        }
+        // Se a data for a mesma, usamos o ID como critério de desempate (o último criado aparece primeiro)
+        return (b.id || 0) - (a.id || 0);
+    });
+
     const count = document.getElementById("extractCount");
     if (count) count.textContent = `${filtrado.length} registros`;
 
-    extractElement.innerHTML = filtrado.slice().reverse().map(h => {
+    // 3. Renderizamos (removemos o .reverse() antigo pois o .sort() já resolveu)
+    extractElement.innerHTML = filtrado.map(h => {
         const qtd = Number(h.qtd ?? h.quantidade) || 0;
         const valorTotal = Number(h.valor) || 0;
         const valorUnitario = Number(h.valorUnitario) || (qtd > 0 ? valorTotal / qtd : 0);
