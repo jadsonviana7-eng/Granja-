@@ -677,8 +677,8 @@
             background: var(--surface-2);
             border: 1px solid var(--line);
             margin: 10px auto;
-            width: 60%; /* Fica menorzinho no centro */
-            border-radius: 20px;
+            width: 100%; /* Fica menorzinho no centro */
+            border-radius: 11px;
             overflow: hidden;
             display: flex;
             align-items: center;
