@@ -1076,51 +1076,6 @@ function atualizarBarra(p, t) {
     if (p >= 100) setTimeout(() => { container.style.display = "none"; }, 3000);
 }
 
-async function syncToCloud() {
-    if (!CLOUD_URL) return;
-
-    // Consolidando o estoque de insumos para facilitar a leitura na planilha
-    const estoqueInsumosConsolidado = (db.insumos || []).map(i => ({
-        item: i.nome,
-        tipo: "INSUMO",
-        quantidade: i.qtd,
-        unidade: i.unidade || "un"
-    }));
-
-    // Consolidando o estoque de ovos
-    const estoqueOvosConsolidado = Object.keys(db.estoque || {}).map(tipo => ({
-        item: `Ovo ${tipo}`,
-        tipo: "OVO",
-        quantidade: db.estoque[tipo],
-        unidade: "un"
-    }));
-
-    const payload = {
-        action: "syncFull",
-        data: {
-            producao: db.coletas || [],
-            extrato: db.historico || [],
-            plantel: db.config.plantel || {},
-            produtos: db.produtos || [],
-            insumos: db.insumos || [],
-            clientes: db.clientes || [],
-            // Nova lista enviando TODO o estoque consolidado
-            estoque_geral: [...estoqueOvosConsolidado, ...estoqueInsumosConsolidado]
-        }
-    };
-
-    try {
-        await fetch(CLOUD_URL, {
-            method: "POST",
-            mode: "no-cors",
-            body: JSON.stringify(payload)
-        });
-        console.log("Sincronização completa enviada.");
-    } catch (error) {
-        console.error("Erro na sincronização:", error);
-    }
-}
-
 // Função para buscar TUDO da nuvem
 async function loadFromCloud() {
     if (!CLOUD_URL) return;
