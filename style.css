@@ -663,3 +663,20 @@
             display: block !important;
             width: 100%;
         }
+
+        /* Estilos para ocultar/exibir o Stock Panel no celular */
+        @media (max-width: 768px) {
+            .stock-panel {
+                transition: all 0.3s ease;
+                cursor: pointer;
+                overflow: hidden;
+            }
+
+            /* Estado oculto: fica apenas uma "faixa" fina e discreta */
+            .stock-panel.is-hidden {
+                height: 10px;
+                opacity: 0.3;
+                background: var(--muted);
+                margin-bottom: 5px;
+            }
+        }

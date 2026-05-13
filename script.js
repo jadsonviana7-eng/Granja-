@@ -255,6 +255,16 @@ function showPage(id) {
     document.getElementById(id)?.classList.add("active");
     document.querySelectorAll(`[data-page="${id}"]`).forEach(btn => btn.classList.add("active"));
 
+    // LÓGICA NOVA: Oculta o stockPanel se não for a página de venda (Financeiro)
+    const panel = document.getElementById("stockPanel");
+    if (panel && window.innerWidth <= 768) {
+        if (id !== "page-venda") {
+            panel.classList.add("is-hidden");
+        } else {
+            panel.classList.remove("is-hidden");
+        }
+    }
+
     if (id === "page-cadastro") {
         renderInsumosNoProduto();
         renderPlantel();
@@ -1312,6 +1322,16 @@ function init() {
 }
 
 document.addEventListener("DOMContentLoaded", init);
+
+// Adiciona o toque para alternar no celular
+    const panel = document.getElementById("stockPanel");
+    if (panel) {
+        panel.addEventListener("click", () => {
+            if (window.innerWidth <= 768) {
+                panel.classList.toggle("is-hidden");
+            }
+        });
+    }
 
 if ("serviceWorker" in navigator) {
     window.addEventListener("load", () => {
