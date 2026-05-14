@@ -1378,19 +1378,34 @@ function switchForm(tipo) {
 
 async function carregarDadosDaNuvem() {
     try {
-        // MUDADO: Usando CLOUD_URL
-        const response = await fetch(CLOUD_URL); 
+        console.log("Tentando carregar dados da nuvem...");
+        const response = await fetch(CLOUD_URL);
         const cloudData = await response.json();
         
         if (cloudData) {
-            // Usa a sua função de extração que já trata a estrutura complexa da planilha
-            db = normalizeDatabase(extractDatabaseFromCloud(cloudData));
+            // Unimos os dados da nuvem com a estrutura local
+            db = {
+                ...db, // Mantém estrutura base
+                ...cloudData, // Sobrescreve com dados da planilha
+                // Garante que o extrato seja reconhecido mesmo que venha com outro nome
+                extrato: cloudData.extrato || cloudData.historico || []
+            };
+
+            // Salva no navegador para uso offline
             localStorage.setItem(STORE_KEY, JSON.stringify(db));
-            render(); 
+            
+            // Processa o consumo de ração com os dados novos do plantel e data
             processarConsumoRacao();
+            
+            // Atualiza a tela
+            render(); 
+            console.log("Dados da nuvem carregados com sucesso.");
         }
     } catch (error) {
-        console.error("Erro ao carregar dados da nuvem:", error);
+        console.error("Erro ao carregar da nuvem, usando local:", error);
+        // Se der erro, o 'db' carregado pelo 'loadDb()' no início do arquivo continua valendo
+        processarConsumoRacao();
+        render();
     }
 }
 
