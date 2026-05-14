@@ -129,15 +129,13 @@ function normalizeHistorico(item) {
 }
 
 function save() {
-    // 1. Salva no localStorage (Segurança local)
+    // 1. Salva no localStorage imediatamente
     localStorage.setItem(STORE_KEY, JSON.stringify(db));
     
-    // 2. Renderiza a interface para o usuário ver a mudança na hora
+    // 2. Atualiza a tela na hora
     render();
 
-    // 2. Envia para o Google Sheets em segundo plano
-    // Usamos um debounce (opcional) para não sobrecarregar a planilha 
-    // se houver muitas alterações seguidas
+    // 3. Dispara a sincronização para a planilha
     sincronizarComNuvem();
 }
 
@@ -917,24 +915,36 @@ function processarConsumoRacao() {
 }
 
 function sincronizarComNuvem() {
+    // 1. Usar a constante CLOUD_URL que você definiu no topo do script
+    if (!CLOUD_URL) {
+        console.error("URL da nuvem não definida.");
+        return;
+    }
+
+    // 2. Montar o payload exatamente como o seu doPost espera (action: "syncFull")
+    // Note que usamos o createCloudPayload() que você já tem no script para enviar os dados organizados
     const payload = {
         action: "syncFull",
-        data: {
-            insumos: db.insumos,       // Onde a nova quantidade de ração está
-            historico: db.historico,   // Onde o novo registro de saída está
-            plantel: db.config.plantel,
-            producao: db.producao,
-            // ... adicione os outros campos que o seu db possui
-        }
+        data: createCloudPayload() 
     };
 
-    fetch(URL_DO_SEU_APPS_SCRIPT, {
+    console.log("Enviando dados para a nuvem...");
+
+    fetch(CLOUD_URL, {
         method: 'POST',
-        mode: 'no-cors', // Importante para evitar erros de CORS no Google Apps Script
+        mode: 'no-cors', // Necessário para Google Apps Script
+        headers: {
+            "Content-Type": "application/json"
+        },
         body: JSON.stringify(payload)
     })
-    .then(() => console.log("Dados enviados para a planilha com sucesso!"))
-    .catch(err => console.error("Erro na sincronização:", err));
+    .then(() => {
+        console.log("Sincronização realizada (Nuvem atualizada).");
+    })
+    .catch(err => {
+        console.error("Erro na sincronização:", err);
+        toast("Erro ao sincronizar com a planilha.");
+    });
 }
 
 function deleteItem(collection, id) {
@@ -1368,21 +1378,19 @@ function switchForm(tipo) {
 
 async function carregarDadosDaNuvem() {
     try {
-        const response = await fetch(URL_DO_SEU_APPS_SCRIPT);
-        const dadosNuvem = await response.json();
+        // MUDADO: Usando CLOUD_URL
+        const response = await fetch(CLOUD_URL); 
+        const cloudData = await response.json();
         
-        if (dadosNuvem) {
-            // Mesclar dados: Prioriza o que está na nuvem
-            // Mas mantém o que for essencial do local se a nuvem estiver vazia
-            db = { ...db, ...dadosNuvem };
+        if (cloudData) {
+            // Usa a sua função de extração que já trata a estrutura complexa da planilha
+            db = normalizeDatabase(extractDatabaseFromCloud(cloudData));
             localStorage.setItem(STORE_KEY, JSON.stringify(db));
-            renderizarTudo(); // Função que atualiza sua tela
-            
-            // Após carregar, processa o consumo de ração acumulado
+            render(); 
             processarConsumoRacao();
         }
     } catch (error) {
-        console.error("Não foi possível carregar dados da nuvem, usando local.", error);
+        console.error("Erro ao carregar dados da nuvem:", error);
     }
 }
 
