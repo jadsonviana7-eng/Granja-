@@ -125,15 +125,28 @@ function normalizeHistorico(item) {
     };
 }
 
+let syncLock = false;
+let syncPending = false;
+let syncTimer = null;
+
 function save() {
-    // 1. Salva no localStorage imediatamente
+
     localStorage.setItem(STORE_KEY, JSON.stringify(db));
-    
-    // 2. Atualiza a tela na hora
+
     render();
 
-    // 3. Dispara a sincronização para a planilha
-    sincronizarComNuvem();
+    scheduleSync();
+}
+
+function scheduleSync() {
+
+    syncPending = true;
+
+    clearTimeout(syncTimer);
+
+    syncTimer = setTimeout(() => {
+        sincronizarComNuvem();
+    }, 2000);
 }
 
 function esc(str) {
@@ -911,27 +924,67 @@ function processarConsumoRacao() {
     }
 }
 
-function sincronizarComNuvem() {
-    if (!CLOUD_URL) return;
+async function sincronizarComNuvem() {
 
-    // Criamos o pacote de dados exatamente como o seu doPost espera
-    const payload = {
-        action: "syncFull",
-        data: createCloudPayload() 
-    };
+    if (syncLock) {
+        console.log("Sincronização já em andamento...");
+        return;
+    }
 
-    // Usamos o formato tradicional de formulário para evitar bloqueios de CORS do Google
-    fetch(CLOUD_URL, {
-        method: 'POST',
-        mode: 'cors', 
-        cache: 'no-cache',
-        headers: {
-            "Content-Type": "application/json"
-        },
-        body: JSON.stringify(payload)
-    })
-    .then(() => console.log("Sincronização enviada para a nuvem."))
-    .catch(err => console.error("Erro ao sincronizar:", err));
+    if (!syncPending) return;
+
+    syncLock = true;
+
+    atualizarBarra(20, "Preparando sincronização...");
+
+    try {
+
+        const payload = createCloudPayload();
+
+        atualizarBarra(45, "Enviando dados...");
+
+        const response = await fetch(`${CLOUD_URL}?t=${Date.now()}`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                action: "syncFull",
+                version: Date.now(),
+                data: payload
+            })
+        });
+
+        if (!response.ok) {
+            throw new Error("Falha ao sincronizar");
+        }
+
+        const result = await response.text();
+
+        console.log(result);
+
+        syncPending = false;
+
+        atualizarBarra(100, "Sincronização concluída!");
+
+        toast("✅ Dados sincronizados!");
+
+    } catch (error) {
+
+        console.error(error);
+
+        atualizarBarra(0, "Falha na sincronização");
+
+        toast("⚠️ Internet instável. Tentando novamente...");
+
+        setTimeout(() => {
+            sincronizarComNuvem();
+        }, 5000);
+
+    } finally {
+
+        syncLock = false;
+    }
 }
 
 function deleteItem(collection, id) {
@@ -1305,67 +1358,71 @@ function switchForm(tipo) {
 }
 
 async function carregarDadosDaNuvem() {
-    console.log("Iniciando sincronização...");
+
+    atualizarBarra(20, "Carregando dados...");
+
     try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 10000);
 
-        const response = await fetch(CLOUD_URL, { signal: controller.signal });
-        if (!response.ok) throw new Error("Erro na resposta da rede");
-        
-        const cloudData = await response.json();
-        clearTimeout(timeoutId);
+        const response = await fetch(`${CLOUD_URL}?t=${Date.now()}`, {
+            method: "GET",
+            cache: "no-store"
+        });
 
-        if (cloudData && typeof cloudData === 'object') {
-            // AJUSTE CRÍTICO: Mapeia 'extrato' da nuvem para 'historico' do app
-            db.coletas = cloudData.coletas || [];
-            db.historico = cloudData.extrato || cloudData.historico || [];
-            db.insumos = cloudData.insumos || [];
-            db.produtos = cloudData.produtos || [];
-            db.clientes = cloudData.clientes || [];
-            db.estoque = cloudData.estoque || db.estoque;
-            
-            if (cloudData.config) {
-                db.config.plantel = cloudData.config.plantel || db.config.plantel;
-                db.config.ultimaDataConsumo = cloudData.config.ultimaDataConsumo || db.config.ultimaDataConsumo;
-            }
-
-            localStorage.setItem(STORE_KEY, JSON.stringify(db));
-            console.log("Dados da nuvem sincronizados com sucesso.");
+        if (!response.ok) {
+            throw new Error("Erro ao carregar");
         }
+
+        const cloudData = await response.json();
+
+        if (cloudData && typeof cloudData === "object") {
+
+            db = normalizeDatabase(
+                extractDatabaseFromCloud(cloudData)
+            );
+
+            localStorage.setItem(
+                STORE_KEY,
+                JSON.stringify(db)
+            );
+
+            render();
+
+            atualizarBarra(100, "Dados carregados!");
+
+            toast("✅ Dados atualizados!");
+
+        }
+
     } catch (error) {
-        console.error("Falha ao carregar da nuvem:", error);
-    } finally {
-        // Garante que o app mostre os dados mesmo se a nuvem falhar
-        processarConsumoRacao();
-        render(); 
+
+        console.error(error);
+
+        atualizarBarra(0, "Modo offline");
+
+        toast("⚠️ Usando dados offline.");
+
     }
 }
 
-function init() {
-    buildTabs();
-    decorateCardHeaders();
-    bindForms();
-    setupPwaInstallButton();
-    setDefaultDates();
-    processarConsumoRacao();
-    render();
-    showPage("page-venda");
-
 async function init() {
+
     buildTabs();
+
     decorateCardHeaders();
+
     bindForms();
+
     setupPwaInstallButton();
+
     setDefaultDates();
 
     await carregarDadosDaNuvem();
 
     processarConsumoRacao();
-    render();
-    showPage("page-venda");
-}
 
+    render();
+
+    showPage("page-venda");
 }
 
 document.addEventListener("DOMContentLoaded", init);
