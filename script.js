@@ -1377,35 +1377,38 @@ function switchForm(tipo) {
 }
 
 async function carregarDadosDaNuvem() {
+    console.log("Iniciando sincronização...");
     try {
-        console.log("Tentando carregar dados da nuvem...");
-        const response = await fetch(CLOUD_URL);
-        const cloudData = await response.json();
-        
-        if (cloudData) {
-            // Unimos os dados da nuvem com a estrutura local
-            db = {
-                ...db, // Mantém estrutura base
-                ...cloudData, // Sobrescreve com dados da planilha
-                // Garante que o extrato seja reconhecido mesmo que venha com outro nome
-                extrato: cloudData.extrato || cloudData.historico || []
-            };
+        // timeout de 10 segundos para não travar o app se a internet estiver lenta
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000);
 
-            // Salva no navegador para uso offline
+        const response = await fetch(CLOUD_URL, { signal: controller.signal });
+        const cloudData = await response.json();
+        clearTimeout(timeoutId);
+
+        if (cloudData && typeof cloudData === 'object') {
+            // Mescla os dados da nuvem com o DB local com cautela
+            db.coletas = cloudData.coletas || db.coletas || [];
+            db.extrato = cloudData.extrato || db.extrato || [];
+            db.insumos = cloudData.insumos || db.insumos || [];
+            db.produtos = cloudData.produtos || db.produtos || [];
+            db.clientes = cloudData.clientes || db.clientes || [];
+            
+            if (cloudData.config) {
+                db.config.plantel = cloudData.config.plantel || db.config.plantel;
+                db.config.ultimaDataConsumo = cloudData.config.ultimaDataConsumo || db.config.ultimaDataConsumo;
+            }
+
             localStorage.setItem(STORE_KEY, JSON.stringify(db));
-            
-            // Processa o consumo de ração com os dados novos do plantel e data
-            processarConsumoRacao();
-            
-            // Atualiza a tela
-            render(); 
-            console.log("Dados da nuvem carregados com sucesso.");
+            console.log("Dados da nuvem sincronizados.");
         }
     } catch (error) {
-        console.error("Erro ao carregar da nuvem, usando local:", error);
-        // Se der erro, o 'db' carregado pelo 'loadDb()' no início do arquivo continua valendo
+        console.error("Falha ao carregar da nuvem (usando cache local):", error);
+    } finally {
+        // INDEPENDENTE de dar erro ou não, processamos o consumo e mostramos a tela
         processarConsumoRacao();
-        render();
+        render(); 
     }
 }
 
