@@ -915,36 +915,26 @@ function processarConsumoRacao() {
 }
 
 function sincronizarComNuvem() {
-    // 1. Usar a constante CLOUD_URL que você definiu no topo do script
-    if (!CLOUD_URL) {
-        console.error("URL da nuvem não definida.");
-        return;
-    }
+    if (!CLOUD_URL) return;
 
-    // 2. Montar o payload exatamente como o seu doPost espera (action: "syncFull")
-    // Note que usamos o createCloudPayload() que você já tem no script para enviar os dados organizados
+    // Criamos o pacote de dados exatamente como o seu doPost espera
     const payload = {
         action: "syncFull",
         data: createCloudPayload() 
     };
 
-    console.log("Enviando dados para a nuvem...");
-
+    // Usamos o formato tradicional de formulário para evitar bloqueios de CORS do Google
     fetch(CLOUD_URL, {
         method: 'POST',
-        mode: 'no-cors', // Necessário para Google Apps Script
+        mode: 'no-cors', 
+        cache: 'no-cache',
         headers: {
             "Content-Type": "application/json"
         },
         body: JSON.stringify(payload)
     })
-    .then(() => {
-        console.log("Sincronização realizada (Nuvem atualizada).");
-    })
-    .catch(err => {
-        console.error("Erro na sincronização:", err);
-        toast("Erro ao sincronizar com a planilha.");
-    });
+    .then(() => console.log("Sincronização enviada para a nuvem."))
+    .catch(err => console.error("Erro ao sincronizar:", err));
 }
 
 function deleteItem(collection, id) {
@@ -1379,21 +1369,23 @@ function switchForm(tipo) {
 async function carregarDadosDaNuvem() {
     console.log("Iniciando sincronização...");
     try {
-        // timeout de 10 segundos para não travar o app se a internet estiver lenta
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 10000);
 
         const response = await fetch(CLOUD_URL, { signal: controller.signal });
+        if (!response.ok) throw new Error("Erro na resposta da rede");
+        
         const cloudData = await response.json();
         clearTimeout(timeoutId);
 
         if (cloudData && typeof cloudData === 'object') {
-            // Mescla os dados da nuvem com o DB local com cautela
-            db.coletas = cloudData.coletas || db.coletas || [];
-            db.extrato = cloudData.extrato || db.extrato || [];
-            db.insumos = cloudData.insumos || db.insumos || [];
-            db.produtos = cloudData.produtos || db.produtos || [];
-            db.clientes = cloudData.clientes || db.clientes || [];
+            // AJUSTE CRÍTICO: Mapeia 'extrato' da nuvem para 'historico' do app
+            db.coletas = cloudData.coletas || [];
+            db.historico = cloudData.extrato || cloudData.historico || [];
+            db.insumos = cloudData.insumos || [];
+            db.produtos = cloudData.produtos || [];
+            db.clientes = cloudData.clientes || [];
+            db.estoque = cloudData.estoque || db.estoque;
             
             if (cloudData.config) {
                 db.config.plantel = cloudData.config.plantel || db.config.plantel;
@@ -1401,12 +1393,12 @@ async function carregarDadosDaNuvem() {
             }
 
             localStorage.setItem(STORE_KEY, JSON.stringify(db));
-            console.log("Dados da nuvem sincronizados.");
+            console.log("Dados da nuvem sincronizados com sucesso.");
         }
     } catch (error) {
-        console.error("Falha ao carregar da nuvem (usando cache local):", error);
+        console.error("Falha ao carregar da nuvem:", error);
     } finally {
-        // INDEPENDENTE de dar erro ou não, processamos o consumo e mostramos a tela
+        // Garante que o app mostre os dados mesmo se a nuvem falhar
         processarConsumoRacao();
         render(); 
     }
