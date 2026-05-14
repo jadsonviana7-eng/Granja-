@@ -2,6 +2,9 @@ const CLOUD_URL = "https://script.google.com/macros/s/AKfycby9KUwnlqAMBz65tXztyH
 const STORE_KEY = "granjaViana_v2_final";
 const today = new Date().toISOString().slice(0, 10);
 
+// Chame isso logo no início do arquivo
+window.addEventListener('load', carregarDadosDaNuvem);
+
 const FEED_PHASES = {
     inicial: { label: "Inicial", consumoKgDia: 0.04 },
     crescimento: { label: "Crescimento", consumoKgDia: 0.08 },
@@ -132,7 +135,10 @@ function save() {
     // 2. Renderiza a interface para o usuário ver a mudança na hora
     render();
 
-    // 3. Envia para o Google Sheets (Sincronização na Nuvem)
+    // 2. Envia para o Google Sheets em segundo plano
+    // Usamos um debounce (opcional) para não sobrecarregar a planilha 
+    // se houver muitas alterações seguidas
+    sincronizarComNuvem();
 }
 
 function esc(str) {
@@ -861,40 +867,74 @@ function processarConsumoRacao() {
 
     if (!ultima) {
         db.config.ultimaDataConsumo = agora.toISOString();
-        localStorage.setItem(STORE_KEY, JSON.stringify(db));
+        save();
         return;
     }
 
     const diasPassados = Math.floor((agora - ultima) / (1000 * 60 * 60 * 24));
     if (diasPassados < 1) return;
 
+    let houveAlteracao = false;
+
     Object.entries(FEED_PHASES).forEach(([fase, config]) => {
         const aves = Number(db.config.plantel[fase]) || 0;
-        const consumo = aves * config.consumoKgDia * diasPassados;
-        if (consumo <= 0) return;
+        const consumoCalculado = aves * config.consumoKgDia * diasPassados;
+        
+        if (consumoCalculado <= 0) return;
 
         const racao = db.insumos.find(ins => ins.tipoConsumo === fase);
-        if (!racao) return;
+        
+        if (racao) {
+            houveAlteracao = true;
+            racao.qtd = Math.max(0, (Number(racao.qtd) || 0) - consumoCalculado);
 
-        racao.qtd = (Number(racao.qtd) || 0) - consumo;
-        db.historico.push({
-            id: Date.now() + Math.random(),
-            data: today,
-            tipo: "SAIDA",
-            categoria: "CONSUMO_RACAO",
-            descricao: `Consumo automático de ração ${config.label}`,
-            insumo: racao.nome,
-            insumoId: racao.id,
-            qtd: Number(consumo.toFixed(2)),
-            unidade: "kg",
-            valorUnitario: 0,
-            valor: 0,
-            status: "pago"
-        });
+            db.historico.push({
+                id: Date.now() + Math.random(),
+                data: agora.toLocaleDateString('pt-BR'),
+                tipo: "SAIDA",
+                categoria: "CONSUMO_RACAO",
+                descricao: `Consumo automático (${diasPassados} dias) - ${config.label}`,
+                insumo: racao.nome,
+                insumoId: racao.id,
+                qtd: Number(consumoCalculado.toFixed(2)),
+                unidade: "kg",
+                valor: 0,
+                status: "pago"
+            });
+        }
     });
 
-    db.config.ultimaDataConsumo = agora.toISOString();
-    save();
+    if (houveAlteracao) {
+        db.config.ultimaDataConsumo = agora.toISOString();
+        save();
+        
+        // CHAMA A SUA SINCRONIZAÇÃO TOTAL
+        // Certifique-se de que o nome da função que envia para o Apps Script seja sincNuvem
+        if (typeof sincronizarComNuvem === "function") {
+            sincronizarComNuvem(); 
+        }
+    }
+}
+
+function sincronizarComNuvem() {
+    const payload = {
+        action: "syncFull",
+        data: {
+            insumos: db.insumos,       // Onde a nova quantidade de ração está
+            historico: db.historico,   // Onde o novo registro de saída está
+            plantel: db.config.plantel,
+            producao: db.producao,
+            // ... adicione os outros campos que o seu db possui
+        }
+    };
+
+    fetch(URL_DO_SEU_APPS_SCRIPT, {
+        method: 'POST',
+        mode: 'no-cors', // Importante para evitar erros de CORS no Google Apps Script
+        body: JSON.stringify(payload)
+    })
+    .then(() => console.log("Dados enviados para a planilha com sucesso!"))
+    .catch(err => console.error("Erro na sincronização:", err));
 }
 
 function deleteItem(collection, id) {
@@ -1324,6 +1364,26 @@ function switchForm(tipo) {
 
     // 3. Atualiza as datas
     setDefaultDates();
+}
+
+async function carregarDadosDaNuvem() {
+    try {
+        const response = await fetch(URL_DO_SEU_APPS_SCRIPT);
+        const dadosNuvem = await response.json();
+        
+        if (dadosNuvem) {
+            // Mesclar dados: Prioriza o que está na nuvem
+            // Mas mantém o que for essencial do local se a nuvem estiver vazia
+            db = { ...db, ...dadosNuvem };
+            localStorage.setItem(STORE_KEY, JSON.stringify(db));
+            renderizarTudo(); // Função que atualiza sua tela
+            
+            // Após carregar, processa o consumo de ração acumulado
+            processarConsumoRacao();
+        }
+    } catch (error) {
+        console.error("Não foi possível carregar dados da nuvem, usando local.", error);
+    }
 }
 
 function init() {
