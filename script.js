@@ -1,4 +1,4 @@
-const CLOUD_URL = "https://script.google.com/macros/s/AKfycby9KUwnlqAMBz65tXztyHHHdsp_Cw3Y8ZtnJ_pQW3zIVe9WlvMcLq529GdsojonS3upaA/exec";
+const CLOUD_URL = "https://script.google.com/macros/s/AKfycbxZG-L7s932UnGNn-OA9FV3R2KKrvfybIvR6pH50G3GQkcCyvl8WDkU_IW0GiiU_YOoZA/exec";
 const STORE_KEY = "granjaViana_v2_final";
 const today = new Date().toISOString().slice(0, 10);
 
