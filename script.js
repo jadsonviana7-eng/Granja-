@@ -2,9 +2,6 @@ const CLOUD_URL = "https://script.google.com/macros/s/AKfycby9KUwnlqAMBz65tXztyH
 const STORE_KEY = "granjaViana_v2_final";
 const today = new Date().toISOString().slice(0, 10);
 
-// Chame isso logo no início do arquivo
-window.addEventListener('load', carregarDadosDaNuvem);
-
 const FEED_PHASES = {
     inicial: { label: "Inicial", consumoKgDia: 0.04 },
     crescimento: { label: "Crescimento", consumoKgDia: 0.08 },
@@ -926,7 +923,7 @@ function sincronizarComNuvem() {
     // Usamos o formato tradicional de formulário para evitar bloqueios de CORS do Google
     fetch(CLOUD_URL, {
         method: 'POST',
-        mode: 'no-cors', 
+        mode: 'cors', 
         cache: 'no-cache',
         headers: {
             "Content-Type": "application/json"
@@ -1212,65 +1209,6 @@ function createCloudPayload() {
     };
 }
 
-async function syncToCloud() {
-    if (!CLOUD_URL) return;
-
-    atualizarBarra(10, "Preparando backup completo...");
-
-    try {
-        const payload = createCloudPayload(); // Sua função que gera o JSON complexo
-        
-        atualizarBarra(40, "Enviando dados estruturados...");
-
-        const response = await fetch(CLOUD_URL, {
-            method: "POST",
-            mode: "no-cors", // Necessário para evitar erros de CORS no Google Apps Script
-            headers: {
-                "Content-Type": "application/json"
-            },
-            body: JSON.stringify({
-                action: "syncFull",
-                data: payload
-            })
-        });
-
-        atualizarBarra(100, "Sincronização concluída!");
-        toast("✅ Backup completo salvo na planilha.");
-    } catch (error) {
-        console.error("Erro crítico na sincronização:", error);
-        atualizarBarra(0, "Falha no backup");
-        toast("❌ Erro ao salvar na nuvem.");
-    }
-}
-
-async function loadFromCloud() {
-    if (!CLOUD_URL) return;
-
-    atualizarBarra(15, "Buscando dados na nuvem...");
-
-    try {
-        atualizarBarra(45, "Baixando backup...");
-        const response = await fetch(`${CLOUD_URL}?t=${Date.now()}`, {
-            method: "GET",
-            cache: "no-store"
-        });
-
-        if (!response.ok) throw new Error("Falha na conexão");
-
-        const cloudData = await response.json();
-        db = normalizeDatabase(extractDatabaseFromCloud(cloudData));
-        localStorage.setItem(STORE_KEY, JSON.stringify(db));
-        render();
-        setDefaultDates();
-        atualizarBarra(100, "Dados restaurados!");
-        toast("Dados carregados da nuvem.");
-    } catch (error) {
-        console.error("Erro ao carregar:", error);
-        atualizarBarra(0, "Falha ao carregar");
-        toast("Não foi possível carregar da nuvem. Dados locais mantidos.");
-    }
-}
-
 function extractDatabaseFromCloud(cloudData) {
     if (!cloudData || typeof cloudData !== "object") {
         throw new Error("Resposta da nuvem vazia ou inválida");
@@ -1413,6 +1351,21 @@ function init() {
     processarConsumoRacao();
     render();
     showPage("page-venda");
+
+async function init() {
+    buildTabs();
+    decorateCardHeaders();
+    bindForms();
+    setupPwaInstallButton();
+    setDefaultDates();
+
+    await carregarDadosDaNuvem();
+
+    processarConsumoRacao();
+    render();
+    showPage("page-venda");
+}
+
 }
 
 document.addEventListener("DOMContentLoaded", init);
