@@ -125,28 +125,14 @@ function normalizeHistorico(item) {
     };
 }
 
-let syncLock = false;
-let syncPending = false;
-let syncTimer = null;
-
 function save() {
-
+    // 1. Salva no localStorage (Segurança local)
     localStorage.setItem(STORE_KEY, JSON.stringify(db));
-
+    
+    // 2. Renderiza a interface para o usuário ver a mudança na hora
     render();
 
-    scheduleSync();
-}
-
-function scheduleSync() {
-
-    syncPending = true;
-
-    clearTimeout(syncTimer);
-
-    syncTimer = setTimeout(() => {
-        sincronizarComNuvem();
-    }, 2000);
+    // 3. Envia para o Google Sheets (Sincronização na Nuvem)
 }
 
 function esc(str) {
@@ -302,7 +288,7 @@ function renderStock() {
     const eggCards = ["Grande", "Medio", "Pequeno"].map(tipo => `
         <div class="stock-card stock-card-eggs">
             <small>Ovos ${tipo}</small>
-            <b>${formatNumber(db.estoque[tipo] || 0, 0)}</b>
+            <b>${formatNumber(db.estoque[tipo] || 0)}</b>
         </div>
     `).join("");
 
@@ -875,116 +861,40 @@ function processarConsumoRacao() {
 
     if (!ultima) {
         db.config.ultimaDataConsumo = agora.toISOString();
-        save();
+        localStorage.setItem(STORE_KEY, JSON.stringify(db));
         return;
     }
 
     const diasPassados = Math.floor((agora - ultima) / (1000 * 60 * 60 * 24));
     if (diasPassados < 1) return;
 
-    let houveAlteracao = false;
-
     Object.entries(FEED_PHASES).forEach(([fase, config]) => {
         const aves = Number(db.config.plantel[fase]) || 0;
-        const consumoCalculado = aves * config.consumoKgDia * diasPassados;
-        
-        if (consumoCalculado <= 0) return;
+        const consumo = aves * config.consumoKgDia * diasPassados;
+        if (consumo <= 0) return;
 
         const racao = db.insumos.find(ins => ins.tipoConsumo === fase);
-        
-        if (racao) {
-            houveAlteracao = true;
-            racao.qtd = Math.max(0, (Number(racao.qtd) || 0) - consumoCalculado);
+        if (!racao) return;
 
-            db.historico.push({
-                id: Date.now() + Math.random(),
-                data: agora.toLocaleDateString('pt-BR'),
-                tipo: "SAIDA",
-                categoria: "CONSUMO_RACAO",
-                descricao: `Consumo automático (${diasPassados} dias) - ${config.label}`,
-                insumo: racao.nome,
-                insumoId: racao.id,
-                qtd: Number(consumoCalculado.toFixed(2)),
-                unidade: "kg",
-                valor: 0,
-                status: "pago"
-            });
-        }
+        racao.qtd = (Number(racao.qtd) || 0) - consumo;
+        db.historico.push({
+            id: Date.now() + Math.random(),
+            data: today,
+            tipo: "SAIDA",
+            categoria: "CONSUMO_RACAO",
+            descricao: `Consumo automático de ração ${config.label}`,
+            insumo: racao.nome,
+            insumoId: racao.id,
+            qtd: Number(consumo.toFixed(2)),
+            unidade: "kg",
+            valorUnitario: 0,
+            valor: 0,
+            status: "pago"
+        });
     });
 
-    if (houveAlteracao) {
-        db.config.ultimaDataConsumo = agora.toISOString();
-        save();
-        
-        // CHAMA A SUA SINCRONIZAÇÃO TOTAL
-        // Certifique-se de que o nome da função que envia para o Apps Script seja sincNuvem
-        if (typeof sincronizarComNuvem === "function") {
-            sincronizarComNuvem(); 
-        }
-    }
-}
-
-async function sincronizarComNuvem() {
-
-    if (syncLock) {
-        console.log("Sincronização já em andamento...");
-        return;
-    }
-
-    if (!syncPending) return;
-
-    syncLock = true;
-
-    atualizarBarra(20, "Preparando sincronização...");
-
-    try {
-
-        const payload = createCloudPayload();
-
-        atualizarBarra(45, "Enviando dados...");
-
-        const response = await fetch(`${CLOUD_URL}?t=${Date.now()}`, {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json"
-            },
-            body: JSON.stringify({
-                action: "syncFull",
-                version: Date.now(),
-                data: payload
-            })
-        });
-
-        if (!response.ok) {
-            throw new Error("Falha ao sincronizar");
-        }
-
-        const result = await response.text();
-
-        console.log(result);
-
-        syncPending = false;
-
-        atualizarBarra(100, "Sincronização concluída!");
-
-        toast("✅ Dados sincronizados!");
-
-    } catch (error) {
-
-        console.error(error);
-
-        atualizarBarra(0, "Falha na sincronização");
-
-        toast("⚠️ Internet instável. Tentando novamente...");
-
-        setTimeout(() => {
-            sincronizarComNuvem();
-        }, 5000);
-
-    } finally {
-
-        syncLock = false;
-    }
+    db.config.ultimaDataConsumo = agora.toISOString();
+    save();
 }
 
 function deleteItem(collection, id) {
@@ -1262,6 +1172,65 @@ function createCloudPayload() {
     };
 }
 
+async function syncToCloud() {
+    if (!CLOUD_URL) return;
+
+    atualizarBarra(10, "Preparando backup completo...");
+
+    try {
+        const payload = createCloudPayload(); // Sua função que gera o JSON complexo
+        
+        atualizarBarra(40, "Enviando dados estruturados...");
+
+        const response = await fetch(CLOUD_URL, {
+            method: "POST",
+            mode: "no-cors", // Necessário para evitar erros de CORS no Google Apps Script
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                action: "syncFull",
+                data: payload
+            })
+        });
+
+        atualizarBarra(100, "Sincronização concluída!");
+        toast("✅ Backup completo salvo na planilha.");
+    } catch (error) {
+        console.error("Erro crítico na sincronização:", error);
+        atualizarBarra(0, "Falha no backup");
+        toast("❌ Erro ao salvar na nuvem.");
+    }
+}
+
+async function loadFromCloud() {
+    if (!CLOUD_URL) return;
+
+    atualizarBarra(15, "Buscando dados na nuvem...");
+
+    try {
+        atualizarBarra(45, "Baixando backup...");
+        const response = await fetch(`${CLOUD_URL}?t=${Date.now()}`, {
+            method: "GET",
+            cache: "no-store"
+        });
+
+        if (!response.ok) throw new Error("Falha na conexão");
+
+        const cloudData = await response.json();
+        db = normalizeDatabase(extractDatabaseFromCloud(cloudData));
+        localStorage.setItem(STORE_KEY, JSON.stringify(db));
+        render();
+        setDefaultDates();
+        atualizarBarra(100, "Dados restaurados!");
+        toast("Dados carregados da nuvem.");
+    } catch (error) {
+        console.error("Erro ao carregar:", error);
+        atualizarBarra(0, "Falha ao carregar");
+        toast("Não foi possível carregar da nuvem. Dados locais mantidos.");
+    }
+}
+
 function extractDatabaseFromCloud(cloudData) {
     if (!cloudData || typeof cloudData !== "object") {
         throw new Error("Resposta da nuvem vazia ou inválida");
@@ -1357,71 +1326,14 @@ function switchForm(tipo) {
     setDefaultDates();
 }
 
-async function carregarDadosDaNuvem() {
-
-    atualizarBarra(20, "Carregando dados...");
-
-    try {
-
-        const response = await fetch(`${CLOUD_URL}?t=${Date.now()}`, {
-            method: "GET",
-            cache: "no-store"
-        });
-
-        if (!response.ok) {
-            throw new Error("Erro ao carregar");
-        }
-
-        const cloudData = await response.json();
-
-        if (cloudData && typeof cloudData === "object") {
-
-            db = normalizeDatabase(
-                extractDatabaseFromCloud(cloudData)
-            );
-
-            localStorage.setItem(
-                STORE_KEY,
-                JSON.stringify(db)
-            );
-
-            render();
-
-            atualizarBarra(100, "Dados carregados!");
-
-            toast("✅ Dados atualizados!");
-
-        }
-
-    } catch (error) {
-
-        console.error(error);
-
-        atualizarBarra(0, "Modo offline");
-
-        toast("⚠️ Usando dados offline.");
-
-    }
-}
-
-async function init() {
-
+function init() {
     buildTabs();
-
     decorateCardHeaders();
-
     bindForms();
-
     setupPwaInstallButton();
-
     setDefaultDates();
-
-    await carregarDadosDaNuvem();
-
     processarConsumoRacao();
-
     render();
-
     showPage("page-venda");
 }
 
