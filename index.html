@@ -13,184 +13,115 @@
     <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
     <link rel="apple-touch-icon" href="icons/icon-192.png">
     <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/daterangepicker/daterangepicker.css" />
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
     <main class="app-shell">
     <header class="topbar">
-        <div class="logo-container">
-            <img src="logo.png" alt="Logo Granja">
-        </div>
+        <div class="logo-container" onclick="showPage('page-visao-geral')" style="cursor:pointer;"><img src="logo.png" alt="Logo Granja"></div>
         <div class="header-titles">
             <span class="sub-title">Granja</span>
             <h1>RANCHO DO VIANA</h1>
         </div>
         <button class="install-app-btn" id="installAppBtn" type="button" hidden>Instalar</button>
-        <div class="today-chip" id="todayLabel"></div>
     </header>
-
-    <section class="hero">
-        <div class="summary-panel card-grande">
-            <h1 id="saldoMes">R$ 0,00</h1>
-            <div class="summary-grid">
-                <div class="summary-card"><small>Vendas</small><b id="vendasMes">R$ 0,00</b></div>
-                <div class="summary-card"><small>Pendentes</small><b id="pendentesMes">R$ 0,00</b></div>
-                <div class="summary-card"><small>Saídas</small><b id="despesasMes">R$ 0,00</b></div>
-            </div>
-        </div>
-        <div class="stock-panel" id="stockPanel"></div>
-    </section>
 
     <nav class="tabs" id="topTabs"></nav>
 
-    <section id="page-venda" class="page active">
-        <div class="mobile-tabs">
-            <button type="button" class="tab-item tab-venda active" onclick="switchForm('venda')">
-                <span class="tab-icon">
-                    <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2.5" fill="none"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
-                </span>
-                Vendas
-            </button>
-            <button type="button" class="tab-item tab-despesa" onclick="switchForm('despesa')">
-                <span class="tab-icon">
-                    <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2.5" fill="none"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline><polyline points="17 6 23 6 23 12"></polyline></svg>
-                </span>
-                Despesas
-            </button>
+    <section id="page-visao-geral" class="page">
+        <div class="hero" style="margin-top: 0;">
+            <div class="summary-panel card-grande">
+                <div id="reportrange-financeiro" class="reportrange-container" style="margin-bottom: 15px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: white;">
+                    <span></span> 
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+                </div>
+                <h1 id="saldoMes">R$ 0,00</h1>
+                <div class="summary-grid">
+                    <div class="summary-card"><small>Vendas</small><b id="vendasMes">R$ 0,00</b></div>
+                    <div class="summary-card"><small>Pendentes</small><b id="pendentesMes">R$ 0,00</b></div>
+                    <div class="summary-card"><small>Saídas</small><b id="despesasMes">R$ 0,00</b></div>
+                </div>
+            </div>
+            <div class="stock-panel" id="stockPanel"></div>
         </div>
 
-        <div class="financeiro-container">
-            <div id="section-venda" class="form-section active">
-                <form class="card shadow" id="saleForm">
-                    <div style="padding: 20px;">
-                        <div class="grid-2">
-                            <div class="field">
-                                <label>Data</label>
-                                <input type="date" id="saleDate" required>
-                            </div>
-                            <div class="field">
-                                <label>Cliente</label>
-                                <select id="saleClient" required></select>
-                            </div>
-                        </div>
+        <div class="dashboard-charts" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 15px; margin-top: 15px;">
+            <div class="card" style="grid-column: 1 / -1;">
+                <div class="card-header"><h2><i class="fas fa-chart-line"></i> Produção Diária e Tendência</h2></div>
+                <div style="height: 300px; padding: 10px;"><canvas id="chartProducao"></canvas></div>
+            </div>
+            <div class="card" style="grid-column: 1 / -1;">
+                <div class="card-header"><h2><i class="fas fa-users"></i> Vendas por Cliente</h2></div>
+                <div style="height: 250px; padding: 10px;"><canvas id="chartVendasCliente"></canvas></div>
+            </div>
+            <div class="card" style="grid-column: 1 / -1;">
+                <div class="card-header"><h2><i class="fas fa-map-marker-alt"></i> Vendas por Cidade</h2></div>
+                <div style="height: 250px; padding: 10px;"><canvas id="chartVendasCidade"></canvas></div>
+            </div>
+        </div>
+    </section>
 
-                        <div class="grid-2">
-                            <div class="field">
-                                <label>Produto</label>
-                                <select id="saleProduct" onchange="updateProductPrice()" required>
-                                    <option value="">Selecione um produto...</option>
-                                </select>
-                            </div>
-                            <div class="field">
-                                <label>Quantidade</label>
-                                <input type="number" id="saleQty" step="1" value="1" oninput="calculateSaleTotal()" required>
-                            </div>
-                        </div>
+    <section id="page-venda" class="page active">
+        <!-- Botões de Ação Rápida -->
+        <div class="card" style="margin-bottom: 15px; padding: 15px; background: var(--surface-2); border: 1px solid var(--line);">
+            <div class="button-group" style="margin-top: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                <button type="button" class="btn primary" onclick="openSaleModal()">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                    Nova Venda
+                </button>
+                <button type="button" class="btn red" onclick="openExpenseModal()">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                    Nova Despesa
+                </button>
+            </div>
+        </div>
 
-                        <div class="grid-3" style="background: var(--surface-2); padding: 10px; border-radius: 8px; margin-top: 10px;">
-                            <div class="field">
-                                <label>V. Unitário (R$)</label>
-                                <input type="number" id="saleUnitValue" step="0.01" oninput="calculateSaleTotal()">
-                            </div>
-                            <div class="field">
-                                <label>Desconto (R$)</label>
-                                <input type="number" id="saleDiscount" step="0.01" value="0.00" oninput="calculateSaleTotal()">
-                            </div>
-                            <div class="field">
-                                <label>Total Final</label>
-                                <input type="number" id="saleTotal" step="0.01" style="background: #eef2ff; color: var(--blue); font-weight: 800;" readonly>
-                            </div>
-                        </div>
-
-                        <div class="grid-2" style="margin-top: 15px;">
-                            <div class="field">
-                                <label>Status do Pagamento</label>
-                                <select id="saleStatus">
-                                    <option value="pago">Pago</option>
-                                    <option value="pendente">Pendente (Fiado)</option>
-                                </select>
-                            </div>
-                            <div class="field">
-                                <label>Observações</label>
-                                <input type="text" id="saleObs" placeholder="Ex: Pix, Dinheiro...">
-                            </div>
-                        </div>
-                        <button type="submit" class="btn primary full mt-1">Registrar Venda</button>
-                    </div>
-                </form>
+        <!-- Conteúdo do Extrato Financeiro -->
+        <div class="card">
+            <div class="card-header">
+                <h2>Extrato Financeiro</h2>
             </div>
 
-            <div id="section-despesa" class="form-section">
-                <form class="card shadow" id="expenseForm">
-                    <div style="padding: 20px;">
-                        <div class="field">
-                            <label>Data da Compra</label>
-                            <input type="date" id="expenseDate" required>
+            <div class="toolbar-extrato" style="margin-bottom: 15px; padding: 10px; background: #f9f9f9; border-radius: 8px;">
+                <div class="filter-row" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px;">
+                    <div class="field" style="margin:0; grid-column: span 2;">
+                        <label><small>Filtrar Período</small></label>
+                        <div id="reportrange-extrato" class="reportrange-container">
+                            <span></span> <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
                         </div>
-                        
-                        <div class="field">
-                            <label>Tipo de Lançamento</label>
-                            <select id="expenseMode" onchange="updateExpenseInsumoFields()">
-                                <option value="FINANCEIRO">Apenas despesa financeira</option>
-                                <option value="ESTOQUE">Despesa com entrada no estoque</option>
-                            </select>
-                        </div>
-
-                        <div class="field" id="expenseInsumoField">
-                            <label>Insumo comprado</label>
-                            <select id="expenseInsumo" onchange="updateExpenseInsumoFields()"></select>
-                            <small id="expenseStockInfo" class="hint-text">Selecione um insumo.</small>
-                        </div>
-
-                        <div class="field">
-                            <label>Descrição</label>
-                            <input id="expenseDesc" type="text" placeholder="Ex: Milho, Energia, etc">
-                        </div>
-                        
-                        <div class="grid-3" style="background: var(--surface-2); padding: 10px; border-radius: 8px;">
-                            <div class="field">
-                                <label id="expenseQtyLabel">Qtd</label>
-                                <input id="expenseQty" type="number" value="1" min="0" step="0.01" oninput="calculateExpenseTotal()">
-                            </div>
-                            <div class="field">
-                                <label>V. Unitário (R$)</label>
-                                <input id="expenseUnitValue" type="number" step="0.01" oninput="calculateExpenseTotal()">
-                            </div>
-                            <div class="field">
-                                <label>Total (R$)</label>
-                                <input id="expenseValue" type="number" step="0.01" readonly style="background: #fee2e2; color: var(--red); font-weight: 800;">
-                            </div>
-                        </div>
-
-                        <div class="field" style="margin-top: 15px;">
-                            <label>Forma de Pagamento</label>
-                            <select id="expensePaymentMethod" onchange="toggleExpenseInstallments()">
-                                <option value="Pix">Pix</option>
-                                <option value="Dinheiro">Dinheiro</option>
-                                <option value="Cartão de Crédito">Cartão de Crédito</option>
-                            </select>
-                        </div>
-
-                        <div id="expenseInstallmentSection" style="display: none; background: #f8fafc; padding: 15px; border-radius: 8px; border: 1px solid var(--line);">
-                            <div class="grid-2">
-                                <div class="field">
-                                    <label>Nº de Parcelas</label>
-                                    <input id="expenseInstallments" type="number" value="1" min="1" oninput="calculateExpenseTotal()">
-                                </div>
-                                <div class="field">
-                                    <label>Dia de Vencimento</label>
-                                    <input id="expenseDueDay" type="number" placeholder="Ex: 10" min="1" max="31">
-                                </div>
-                            </div>
-                            <div class="field">
-                                <label>Valor da Parcela (R$)</label>
-                                <input id="expenseInstallmentValue" type="text" readonly style="background: #e2e8f0; font-weight: bold;">
-                            </div>
-                        </div>
-                        
-                        <button class="btn red full" type="submit" style="margin-top: 15px;">Salvar Despesa</button>
                     </div>
-                </form>
+                    <div class="field" style="margin:0">
+                        <label><small>Tipo</small></label>
+                        <select id="filterType">
+                            <option value="TODOS">Todos</option>
+                            <option value="VENDA">Vendas</option>
+                            <option value="SAIDA">Despesas</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="action-row" style="display: flex; justify-content: space-between; align-items: center; margin-top: 15px; padding-top: 10px; border-top: 1px solid #ddd;">
+                    <span id="extractCount" style="font-size: 0.85rem; color: #666; font-weight: bold;">0 registros</span>
+                    
+                    <div class="button-group-actions" style="display: flex; gap: 8px;">
+                        <button type="button" class="btn-action csv" onclick="exportarCSV()" title="Exportar Excel">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
+                            Excel
+                        </button>
+                        <button type="button" class="btn-action pdf" onclick="exportarPDF()" title="Gerar PDF">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9V2h12v7"></path><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
+                            PDF
+                        </button>
+                        <button type="button" class="btn-action" onclick="showFinancialReport()" title="Gerar Relatório Financeiro" style="background: var(--blue); color: white; border-color: var(--blue);">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: white;"><path d="M21.21 15.89A10 10 0 1 1 8 2.83"></path><path d="M22 12A10 10 0 0 0 12 2v10z"></path></svg>
+                            Relatório
+                        </button>
+                    </div>
+                </div>
             </div>
+
+            <div id="extractList" class="list"></div>
         </div>
     </section>
 
@@ -215,55 +146,9 @@
         </div>
     </section>
 
-    <section id="page-extrato" class="page">
-        <div class="card">
-            <div class="card-header">
-                <h2>Extrato</h2>
-            </div>
-
-            <div class="toolbar-extrato" style="margin-bottom: 15px; padding: 10px; background: #f9f9f9; border-radius: 8px;">
-                <div class="filter-row" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px;">
-                    <div class="field" style="margin:0">
-                        <label><small>Início</small></label>
-                        <input type="date" id="filterStart">
-                    </div>
-                    <div class="field" style="margin:0">
-                        <label><small>Fim</small></label>
-                        <input type="date" id="filterEnd">
-                    </div>
-                    <div class="field" style="margin:0">
-                        <label><small>Tipo</small></label>
-                        <select id="filterType">
-                            <option value="TODOS">Todos</option>
-                            <option value="VENDA">Vendas</option>
-                            <option value="SAIDA">Despesas</option>
-                        </select>
-                    </div>
-                </div>
-
-                <div class="action-row" style="display: flex; justify-content: space-between; align-items: center; margin-top: 15px; padding-top: 10px; border-top: 1px solid #ddd;">
-                    <span id="extractCount" style="font-size: 0.85rem; color: #666; font-weight: bold;">0 registros</span>
-                    
-                    <div class="button-group-actions" style="display: flex; gap: 8px;">
-                        <button type="button" class="btn-action csv" onclick="exportarCSV()" title="Exportar Excel">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
-                            Excel
-                        </button>
-                        <button type="button" class="btn-action pdf" onclick="exportarPDF()" title="Gerar PDF">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9V2h12v7"></path><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
-                            PDF
-                        </button>
-                    </div>
-                </div>
-            </div>
-
-            <div id="extractList" class="list">
-                </div>
-        </div>
-    </section>
     <section id="page-cadastro" class="page">
         <div class="grid-2">
-            <div class="card" style="margin-bottom: 20px; border-left: 5px solid var(--amber);">
+            <div class="card card-plantel" style="margin-bottom: 20px;">
                 <div class="card-header">
                     <h2><i class="fas fa-kiwi-bird"></i> Gerenciamento do Plantel</h2>
                 </div>
@@ -331,7 +216,7 @@
                 <div class="grid-3">
                     <div class="field">
                         <label>Preço R$</label>
-                        <input id="productPrice" type="number" step="0.01">
+                        <input id="productPrice" type="text" inputmode="decimal">
                     </div>
                     <div class="field">
                         <label>Tipo Ovo</label>
@@ -348,14 +233,12 @@
                 </div>
 
                 <div class="field" style="margin-top: 10px;">
-                    <label style="color: var(--blue); font-weight: bold;">
-                        <i class="fas fa-layer-group"></i> Composição (Baixa Automática)
-                    </label>
-                    <div id="productCompositionList" class="composition-container">
-                        </div>
-                    <small style="color: var(--muted); display: block; margin-top: 5px;">
-                        Informe a quantidade gasta para <b>uma unidade</b> deste produto.
-                    </small>
+                    <button type="button" class="btn ghost small" onclick="openCompositionModal('new')" style="width: 100%; border-style: dashed; border-color: var(--blue); color: var(--blue);">
+                        <i class="fas fa-layer-group"></i> Configurar Composição
+                    </button>
+                    <div id="compositionSummary" style="margin-top: 8px; font-size: 0.8rem; color: var(--muted); font-weight: 600; text-align: center;">
+                        Nenhuma composição definida.
+                    </div>
                 </div>
 
                 <button class="btn primary full" type="submit" style="margin-top: 10px;">Salvar Produto</button>
@@ -421,16 +304,6 @@
             </div>
         </div>
 
-        <div id="syncProgressContainer" style="display: none; width: 100%; background: #f1f5f9; border: 1px solid #dfe7ef; border-radius: 12px; padding: 15px; margin-bottom: 20px;">
-            <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
-                <span id="syncStatusText" style="font-size: 13px; font-weight: 800; color: #2563eb;">Iniciando...</span>
-                <span id="syncPercentage" style="font-size: 13px; font-weight: 800; color: #64748b;">0%</span>
-            </div>
-            <div style="width: 100%; background: #dfe7ef; height: 10px; border-radius: 5px; overflow: hidden;">
-                <div id="syncProgressBar" style="width: 0%; height: 100%; background: #2563eb; transition: width 0.4s ease-in-out;"></div>
-            </div>
-        </div>
-
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 10px;">
             <button class="btn primary" onclick="syncToCloud()">Salvar na Nuvem</button>
             <button class="btn blue" onclick="loadFromCloud()">Carregar da Nuvem</button>
@@ -449,70 +322,362 @@
     <nav class="bottom-nav" id="bottomTabs"></nav>
     <div class="toast" id="toast"></div>
 
+<div id="saleModal" class="modal-overlay" style="display:none;">
+    <div class="modal-content card">
+        <div class="card-header" style="margin: 0; border-radius: 12px 12px 0 0;">
+            <h2>Registrar Nova Venda</h2>
+            <button class="modal-close" onclick="closeSaleModal()"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
+        </div>
+        <form id="saleForm" style="display: flex; flex-direction: column; flex: 1; overflow: hidden; min-height: 0;">
+            <div class="modal-body">
+                <div class="grid-2">
+                    <div class="field">
+                        <label>Data</label>
+                        <input type="date" id="saleDate" required>
+                    </div>
+                    <div class="field">
+                        <label>Cliente</label>
+                        <select id="saleClient" required></select>
+                    </div>
+                </div>
+                <div class="grid-2">
+                    <div class="field">
+                        <label>Produto</label>
+                        <select id="saleProduct" onchange="updateProductPrice()" required>
+                            <option value="">Selecione um produto...</option>
+                        </select>
+                    </div>
+                    <div class="field">
+                        <label>Quantidade</label>
+                        <input type="number" id="saleQty" step="1" value="1" oninput="calculateSaleTotal()" required>
+                    </div>
+                </div>
+                <div class="grid-3" style="background: var(--surface-2); padding: 10px; border-radius: 8px;">
+                    <div class="field">
+                        <label>V. Unitário (R$)</label>
+                        <input type="text" id="saleUnitValue" inputmode="decimal" oninput="calculateSaleTotal()">
+                    </div>
+                    <div class="field">
+                        <label>Desconto (R$)</label>
+                        <input type="text" id="saleDiscount" inputmode="decimal" value="R$ 0,00" oninput="calculateSaleTotal()">
+                    </div>
+                    <div class="field">
+                        <label>Total Final</label>
+                        <input type="text" id="saleTotal" style="background: #eef2ff; color: var(--blue); font-weight: 800;" readonly>
+                    </div>
+                </div>
+                <div class="grid-2" style="margin-top: 15px;">
+                    <div class="field">
+                        <label>Status do Pagamento</label>
+                        <select id="saleStatus">
+                            <option value="pago">Pago</option>
+                            <option value="pendente">Pendente (Fiado)</option>
+                        </select>
+                    </div>
+                    <div class="field">
+                        <label>Observações</label>
+                        <input type="text" id="saleObs" placeholder="Ex: Pix, Dinheiro...">
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="submit" class="btn primary full">Registrar Venda</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div id="expenseModal" class="modal-overlay" style="display:none;">
+    <div class="modal-content card">
+        <div class="card-header" style="margin: 0; border-radius: 12px 12px 0 0;">
+            <h2>Registrar Nova Despesa</h2>
+            <button class="modal-close" onclick="closeExpenseModal()"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
+        </div>
+        <form id="expenseForm" style="display: flex; flex-direction: column; flex: 1; overflow: hidden; min-height: 0;">
+            <div class="modal-body">
+                <div class="field">
+                    <label>Data da Compra</label>
+                    <input type="date" id="expenseDate" required>
+                </div>
+                <div class="field">
+                    <label>Tipo de Lançamento</label>
+                    <select id="expenseMode" onchange="updateExpenseInsumoFields()">
+                        <option value="FINANCEIRO">Apenas despesa financeira</option>
+                        <option value="ESTOQUE">Despesa com entrada no estoque</option>
+                    </select>
+                </div>
+                <div class="field" id="expenseInsumoField">
+                    <label>Insumo comprado</label>
+                    <select id="expenseInsumo" onchange="updateExpenseInsumoFields()"></select>
+                    <small id="expenseStockInfo" class="hint-text">Selecione um insumo.</small>
+                </div>
+                <div class="field">
+                    <label>Descrição</label>
+                    <input id="expenseDesc" type="text" placeholder="Ex: Milho, Energia, etc">
+                </div>
+                <div class="grid-3" style="background: var(--surface-2); padding: 10px; border-radius: 8px;">
+                    <div class="field">
+                        <label id="expenseQtyLabel">Qtd</label>
+                        <input id="expenseQty" type="number" value="1" min="0" step="0.01" oninput="calculateExpenseTotal()">
+                    </div>
+                    <div class="field">
+                        <label>V. Unitário (R$)</label>
+                        <input id="expenseUnitValue" type="text" inputmode="decimal" oninput="calculateExpenseTotal()">
+                    </div>
+                    <div class="field">
+                        <label>Total (R$)</label>
+                        <input id="expenseValue" type="text" readonly style="background: #fee2e2; color: var(--red); font-weight: 800;">
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn red full" type="submit">Salvar Despesa</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div id="compositionModal" class="modal-overlay" style="display:none;">
+    <div class="modal-content card">
+        <div class="card-header" style="margin: 0; border-radius: 12px 12px 0 0;">
+            <h2>Composição do Produto</h2>
+            <button class="modal-close" onclick="closeCompositionModal()"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
+        </div>
+        <div class="modal-body">
+            <p style="font-size: 0.85rem; color: var(--muted); margin-bottom: 15px;">
+                Informe a quantidade de cada insumo gasta para produzir <b>uma unidade</b> deste produto.
+            </p>
+            <div id="productCompositionList" class="composition-container" style="max-height: 300px;">
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="btn primary full" onclick="updateCompositionSummary()">Confirmar e Fechar</button>
+        </div>
+    </div>
+</div>
+
+<div id="productEditModal" class="modal-overlay" style="display:none;">
+    <div class="modal-content card">
+        <div class="card-header" style="margin: 0; border-radius: 12px 12px 0 0;">
+            <h2>Editar Produto</h2>
+            <button class="modal-close" onclick="closeProductEditModal()"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
+        </div>
+        <form id="productEditForm" style="display: flex; flex-direction: column; flex: 1; overflow: hidden;">
+            <input type="hidden" id="editProdId">
+            <div class="modal-body">
+                <div class="field">
+                    <label>Nome do Produto</label>
+                    <input id="editProdName" type="text" required>
+                </div>
+                <div class="grid-3">
+                    <div class="field">
+                        <label>Preço R$</label>
+                        <input id="editProdPrice" type="text" inputmode="decimal" required>
+                    </div>
+                    <div class="field">
+                        <label>Tipo Ovo</label>
+                        <select id="editProdType">
+                            <option>Grande</option>
+                            <option value="Medio">Médio</option>
+                            <option>Pequeno</option>
+                        </select>
+                    </div>
+                    <div class="field">
+                        <label>Qtd Ovos</label>
+                        <input id="editProdEggs" type="number" required>
+                    </div>
+                </div>
+
+                <div class="field" style="margin-top: 10px;">
+                    <button type="button" class="btn ghost small" onclick="openCompositionModal('edit')" style="width: 100%; border-style: dashed; border-color: var(--blue); color: var(--blue);">
+                        <i class="fas fa-layer-group"></i> Alterar Composição
+                    </button>
+                    <div id="compositionSummaryEdit" style="margin-top: 8px; font-size: 0.8rem; color: var(--muted); font-weight: 600; text-align: center;">
+                        Composição carregada.
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn primary full" type="submit">Salvar Alterações</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div id="clientEditModal" class="modal-overlay" style="display:none;">
+    <div class="modal-content card">
+        <div class="card-header" style="margin: 0; border-radius: 12px 12px 0 0;">
+            <h2>Editar Cliente</h2>
+            <button class="modal-close" onclick="closeClientEditModal()"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
+        </div>
+        <form id="clientEditForm" style="display: flex; flex-direction: column; flex: 1; overflow: hidden;">
+            <input type="hidden" id="editClientId">
+            <div class="modal-body">
+                <div class="field">
+                    <label>Nome Completo</label>
+                    <input id="editClientName" type="text" required>
+                </div>
+                <div class="grid-2">
+                    <div class="field">
+                        <label>Telefone / WhatsApp</label>
+                        <input id="editClientPhone" type="tel">
+                    </div>
+                    <div class="field">
+                        <label>Cidade</label>
+                        <input id="editClientCity" type="text">
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn primary full" type="submit">Salvar Alterações</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div id="reportModal" class="modal-overlay" style="display:none;">
+    <div class="modal-content card" style="max-width: 800px;">
+        <div class="card-header" style="margin: 0; border-radius: 12px 12px 0 0;">
+            <h2>Relatório de Fluxo de Caixa</h2>
+            <button class="modal-close" onclick="closeReportModal()"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
+        </div>
+        <div class="modal-body">
+            <div id="reportPeriodText" style="font-weight: 800; margin-bottom: 15px; color: var(--blue); text-transform: uppercase; font-size: 0.9rem;"></div>
+            
+            <div style="overflow-x: auto;">
+                <table style="width: 100%; border-collapse: collapse; font-size: 0.85rem; margin-bottom: 20px;">
+                    <thead>
+                        <tr style="background: #f1f5f9; border-bottom: 2px solid #cbd5e1; text-align: left;">
+                            <th style="padding: 10px; border: 1px solid var(--line);">Data</th>
+                            <th style="padding: 10px; border: 1px solid var(--line);">Descrição / Cliente</th>
+                            <th style="padding: 10px; border: 1px solid var(--line);">Tipo</th>
+                            <th style="padding: 10px; border: 1px solid var(--line); text-align: right;">Valor</th>
+                            <th style="padding: 10px; border: 1px solid var(--line);">Status</th>
+                        </tr>
+                    </thead>
+                    <tbody id="reportTableBody"></tbody>
+                </table>
+            </div>
+
+            <div id="reportSummaryContent" class="report-summary" style="background: #f8fafc; padding: 20px; border-radius: 12px; border: 2px solid var(--blue); box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);">
+                <!-- Preenchido via JS -->
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="btn blue full" onclick="printReport()"><i class="fas fa-print"></i> Imprimir Relatório</button>
+        </div>
+    </div>
+</div>
+
+<div id="insumoEditModal" class="modal-overlay" style="display:none;">
+    <div class="modal-content card">
+        <div class="card-header" style="margin: 0; border-radius: 12px 12px 0 0;">
+            <h2>Editar Insumo</h2>
+            <button class="modal-close" onclick="closeInsumoEditModal()"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
+        </div>
+        <form id="insumoEditForm" style="display: flex; flex-direction: column; flex: 1; overflow: hidden;">
+            <input type="hidden" id="editInsumoId">
+            <div class="modal-body">
+                <div class="field">
+                    <label>Nome do Insumo</label>
+                    <input id="editInsumoName" type="text" required>
+                </div>
+                <div class="field">
+                    <label>Tipo de Insumo</label>
+                    <select id="editInsumoTipo" onchange="toggleEditUnitIndicator()">
+                        <option value="GERAL">Embalagem / Outros (un)</option>
+                        <option value="inicial">Ração: Inicial (kg)</option>
+                        <option value="crescimento">Ração: Crescimento (kg)</option>
+                        <option value="prePostura">Ração: Pré-Postura (kg)</option>
+                        <option value="postura">Ração: Postura (kg)</option>
+                    </select>
+                </div>
+                <div class="field">
+                    <label id="editInsumoQtyLabel">Estoque Atual</label>
+                    <div style="position: relative;">
+                        <input id="editInsumoQty" type="number" step="0.01" style="padding-right: 45px;">
+                        <span id="editUnitIndicator" style="position: absolute; right: 15px; top: 50%; transform: translateY(-50%); color: var(--muted); font-size: 0.8rem; font-weight: bold;">un</span>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn primary full" type="submit">Salvar Alterações</button>
+            </div>
+        </form>
+    </div>
+</div>
+
 <div id="editModal" class="modal-overlay" style="display:none;">
     <div class="modal-content card">
-        <div class="card-header">
+        <div class="card-header" style="margin: 0; border-radius: 12px 12px 0 0;">
             <h2>Editar Lançamento</h2>
-            <button class="btn small red" onclick="closeEditModal()">X</button>
+            <button class="modal-close" onclick="closeEditModal()"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
         </div>
         
-        <form id="editForm">
+        <form id="editForm" style="display: flex; flex-direction: column; flex: 1; overflow: hidden;">
             <input type="hidden" id="editId">
             
-            <div class="field">
-                <label>Data</label>
-                <input type="date" id="editDate" required>
-            </div>
-
-            <div class="field">
-                <label>Cliente / Descrição</label>
-                <input type="text" id="editCliente">
-            </div>
-
-            <div class="grid-2">
+            <div class="modal-body">
                 <div class="field">
-                    <label>Quantidade</label>
-                    <input type="number" id="editQty" step="1" oninput="calcEditTotal()">
+                    <label>Data</label>
+                    <input type="date" id="editDate" required>
                 </div>
+
                 <div class="field">
-                    <label>V. Unitário</label>
-                    <input type="number" id="editUnit" step="0.01" oninput="calcEditTotal()">
+                    <label>Cliente / Descrição</label>
+                    <input type="text" id="editCliente">
                 </div>
-            </div>
 
-            <div class="grid-2">
+                <div class="grid-2">
+                    <div class="field">
+                        <label>Quantidade</label>
+                        <input type="number" id="editQty" step="1" oninput="calcEditTotal()">
+                    </div>
+                    <div class="field">
+                        <label>V. Unitário</label>
+                        <input type="number" id="editUnit" step="0.01" oninput="calcEditTotal()">
+                    </div>
+                </div>
+
+                <div class="grid-2">
+                    <div class="field">
+                        <label>Desconto (R$)</label>
+                        <input type="text" id="editDisc" inputmode="decimal" oninput="calcEditTotal()">
+                    </div>
+                    <div class="field">
+                        <label>Total Final</label>
+                        <input type="text" id="editTotal" readonly style="background:var(--surface-2)">
+                    </div>
+                </div>
+
                 <div class="field">
-                    <label>Desconto (R$)</label>
-                    <input type="number" id="editDisc" step="0.01" oninput="calcEditTotal()">
+                    <label>Status de Pagamento</label>
+                    <select id="editStatus">
+                        <option value="pago">Pago / Concluído</option>
+                        <option value="pendente">Pendente / Fiado</option>
+                    </select>
                 </div>
+
                 <div class="field">
-                    <label>Total Final</label>
-                    <input type="number" id="editTotal" readonly style="background:var(--surface-2)">
+                    <label>Observações</label>
+                    <input type="text" id="editObs">
                 </div>
             </div>
 
-            <div class="field">
-                <label>Status de Pagamento</label>
-                <select id="editStatus">
-                    <option value="pago">Pago / Concluído</option>
-                    <option value="pendente">Pendente / Fiado</option>
-                </select>
-            </div>
-
-            <div class="field">
-                <label>Observações</label>
-                <input type="text" id="editObs">
-            </div>
-
-            <div class="button-group" style="margin-top:20px; flex-direction: row !important;">
-                <button type="button" class="btn red" onclick="deleteCurrentItem()" style="flex:1">Excluir</button>
-                <button type="submit" class="btn primary" style="flex:2">Salvar Alterações</button>
+            <div class="modal-footer">
+                <div class="button-group" style="flex-direction: row !important;">
+                    <button type="button" class="btn red" onclick="deleteCurrentItem()" style="flex:1">Excluir</button>
+                    <button type="submit" class="btn primary" style="flex:2">Salvar Alterações</button>
+                </div>
             </div>
         </form>
     </div>
 </div>
 
 
+    <script src="https://cdn.jsdelivr.net/jquery/latest/jquery.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/momentjs/latest/moment.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/daterangepicker/daterangepicker.min.js"></script>
     <script src="script.js"></script>
 </body>
 </html>
