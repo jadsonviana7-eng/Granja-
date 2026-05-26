@@ -586,10 +586,11 @@ function renderFinance() {
     const pendentes = noperiodo.filter(h => h.tipo === "VENDA" && h.status === "pendente").reduce((acc, h) => acc + (Number(h.valor) || 0), 0);
     const saidas    = noperiodo.filter(h => h.tipo === "SAIDA").reduce((acc, h) => acc + (Number(h.valor) || 0), 0);
 
-    document.getElementById("vendasMes").textContent    = money(vendas);
-    document.getElementById("pendentesMes").textContent = money(pendentes);
-    document.getElementById("despesasMes").textContent  = money(saidas);
-    document.getElementById("saldoMes").textContent     = money(vendas - saidas);
+    const formatResumo = (val) => money(val).replace("R$", "").trim();
+    document.getElementById("vendasMes").textContent    = formatResumo(vendas);
+    document.getElementById("pendentesMes").textContent = formatResumo(pendentes);
+    document.getElementById("despesasMes").textContent  = formatResumo(saidas);
+    document.getElementById("saldoMes").textContent     = formatResumo(vendas - saidas);
 }
 
 function renderExtract() {
@@ -943,8 +944,11 @@ function formatarCampoMoeda(e) {
 function getValueFromMask(idOrElement) {
     const el = typeof idOrElement === 'string' ? document.getElementById(idOrElement) : idOrElement;
     if (!el) return 0;
-    const value = el.value.replace(/[R$\s.]/g, "").replace(",", ".");
-    return parseFloat(value) || 0;
+    // Pega apenas os números (remove R$, espaços, pontos e vírgulas)
+    const digits = el.value.replace(/\D/g, "");
+    if (!digits) return 0;
+    // Converte para decimal (ex: "1000" vira 10.00)
+    return parseFloat(digits) / 100;
 }
 
 function setupCurrencyMasks() {
@@ -954,7 +958,12 @@ function setupCurrencyMasks() {
     ];
     inputs.forEach(id => {
         const el = document.getElementById(id);
-        if (el) el.addEventListener("input", formatarCampoMoeda);
+        if (el) {
+            // Garante que o campo comece formatado como zero
+            if (!el.value || el.value === "0") el.value = money(0);
+            // Adiciona o event listener para formatar e recalcular
+            el.addEventListener("input", formatarCampoMoeda);
+        }
     });
 }
 
@@ -1011,7 +1020,11 @@ function calculateExpenseTotal() {
     const installments = parseInt(document.getElementById("expenseInstallments")?.value, 10) || 1;
     const total = qty * unit;
     const totalField = document.getElementById("expenseValue");
+    const installmentField = document.getElementById("expenseInstallmentValue");
+
+    // Recalcula e formata o total
     if (totalField) totalField.value = money(total);
+    if (installmentField) installmentField.value = money(installments > 0 ? total / installments : total);
 }
 
 function toggleExpenseInstallments() {
@@ -1031,7 +1044,7 @@ function handleSale(e) {
     const qty = parseFloat(document.getElementById("saleQty").value) || 0;
     const unit = getValueFromMask("saleUnitValue");
     const disc = getValueFromMask("saleDiscount");
-    const total = getValueFromMask("saleTotal");
+    const total = Math.max(0, (qty * unit) - disc);
     const ovosVendidos = (prod.ovosPorItem || 0) * qty;
 
     if (prod.tipoOvo && db.estoque[prod.tipoOvo] !== undefined) {
@@ -1062,7 +1075,7 @@ function handleSale(e) {
     e.target.reset();
     setDefaultDates();
     document.getElementById("saleQty").value = "1";
-    document.getElementById("saleDiscount").value = "0.00";
+    document.getElementById("saleDiscount").value = money(0);
     calculateSaleTotal();
     closeSaleModal();
     toast("Venda registrada e estoques atualizados!");
@@ -1098,8 +1111,9 @@ function handleExpense(e) {
     const insumoId = document.getElementById("expenseInsumo").value;
     const insumo = db.insumos.find(i => String(i.id) === String(insumoId));
     const qtd = parseFloat(document.getElementById("expenseQty").value) || 0;
-    const valorTotal = getValueFromMask("expenseValue");
-    const valorUnitario = getValueFromMask("expenseUnitValue") || (qtd > 0 ? valorTotal / qtd : valorTotal);
+    const unit = getValueFromMask("expenseUnitValue");
+    const valorTotal = qtd * unit;
+    const valorUnitario = unit;
 
     if (mode === "ESTOQUE") {
         if (!insumo) return toast("Selecione o insumo comprado.");
@@ -1125,12 +1139,11 @@ function handleExpense(e) {
         dataPagamento: today
     });
 
-    document.getElementById("expenseDesc").value = "";
-    document.getElementById("expenseValue").value = "";
-
     save();
     e.target.reset();
     setDefaultDates();
+    document.getElementById("expenseQty").value = "1";
+    document.getElementById("expenseUnitValue").value = money(0);
     calculateExpenseTotal();
     updateExpenseInsumoFields();
     closeExpenseModal();

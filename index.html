@@ -13,6 +13,9 @@
     <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
     <link rel="apple-touch-icon" href="icons/icon-192.png">
     <link rel="stylesheet" href="style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto+Slab:wght@900&display=swap" rel="stylesheet">
     <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/daterangepicker/daterangepicker.css" />
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
@@ -22,7 +25,10 @@
         <div class="logo-container" onclick="showPage('page-visao-geral')" style="cursor:pointer;"><img src="logo.png" alt="Logo Granja"></div>
         <div class="header-titles">
             <span class="sub-title">Granja</span>
-            <h1>RANCHO DO VIANA</h1>
+            <h1>
+                <span class="title-line-1">RANCHO DO</span>
+                <span class="title-line-2">VIANA</span>
+            </h1>
         </div>
         <button class="install-app-btn" id="installAppBtn" type="button" hidden>Instalar</button>
     </header>
@@ -32,15 +38,15 @@
     <section id="page-visao-geral" class="page">
         <div class="hero" style="margin-top: 0;">
             <div class="summary-panel card-grande">
-                <div id="reportrange-financeiro" class="reportrange-container" style="margin-bottom: 15px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: white;">
+                <div id="reportrange-financeiro" class="reportrange-container" style="margin-bottom: 15px; background: rgba(255,255,255,.07); border: 1px solid rgba(255,255,255,.14); color: #cbd5e1;">
                     <span></span> 
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
                 </div>
-                <h1 id="saldoMes">R$ 0,00</h1>
+                <h1 id="saldoMes">0,00</h1>
                 <div class="summary-grid">
-                    <div class="summary-card"><small>Vendas</small><b id="vendasMes">R$ 0,00</b></div>
-                    <div class="summary-card"><small>Pendentes</small><b id="pendentesMes">R$ 0,00</b></div>
-                    <div class="summary-card"><small>Saídas</small><b id="despesasMes">R$ 0,00</b></div>
+                    <div class="summary-card"><small>Vendas</small><b id="vendasMes">0,00</b></div>
+                    <div class="summary-card"><small>Pendentes</small><b id="pendentesMes">0,00</b></div>
+                    <div class="summary-card"><small>Saídas</small><b id="despesasMes">0,00</b></div>
                 </div>
             </div>
             <div class="stock-panel" id="stockPanel"></div>
@@ -355,11 +361,11 @@
                 <div class="grid-3" style="background: var(--surface-2); padding: 10px; border-radius: 8px;">
                     <div class="field">
                         <label>V. Unitário (R$)</label>
-                        <input type="text" id="saleUnitValue" inputmode="decimal" oninput="calculateSaleTotal()">
+                        <input type="text" id="saleUnitValue" inputmode="decimal">
                     </div>
                     <div class="field">
                         <label>Desconto (R$)</label>
-                        <input type="text" id="saleDiscount" inputmode="decimal" value="R$ 0,00" oninput="calculateSaleTotal()">
+                        <input type="text" id="saleDiscount" inputmode="decimal" value="R$ 0,00">
                     </div>
                     <div class="field">
                         <label>Total Final</label>
@@ -427,6 +433,32 @@
                     <div class="field">
                         <label>Total (R$)</label>
                         <input id="expenseValue" type="text" readonly style="background: #fee2e2; color: var(--red); font-weight: 800;">
+                    </div>
+                </div>
+
+                <div class="field" style="margin-top: 15px;">
+                    <label>Forma de Pagamento</label>
+                    <select id="expensePaymentMethod" onchange="toggleExpenseInstallments()">
+                        <option value="Pix">Pix</option>
+                        <option value="Dinheiro">Dinheiro</option>
+                        <option value="Cartão de Crédito">Cartão de Crédito</option>
+                    </select>
+                </div>
+
+                <div id="expenseInstallmentSection" style="display: none; background: var(--surface-2); padding: 15px; border-radius: 8px; border: 1px solid var(--line);">
+                    <div class="grid-2">
+                        <div class="field">
+                            <label>Nº de Parcelas</label>
+                            <input id="expenseInstallments" type="number" value="1" min="1" oninput="calculateExpenseTotal()">
+                        </div>
+                        <div class="field">
+                            <label>Dia de Vencimento</label>
+                            <input id="expenseDueDay" type="number" placeholder="Ex: 10" min="1" max="31">
+                        </div>
+                    </div>
+                    <div class="field">
+                        <label>Valor da Parcela (R$)</label>
+                        <input id="expenseInstallmentValue" type="text" readonly style="background: var(--line); font-weight: bold;">
                     </div>
                 </div>
             </div>
@@ -631,18 +663,18 @@
                 <div class="grid-2">
                     <div class="field">
                         <label>Quantidade</label>
-                        <input type="number" id="editQty" step="1" oninput="calcEditTotal()">
+                        <input type="number" id="editQty" oninput="calcEditTotal()">
                     </div>
                     <div class="field">
                         <label>V. Unitário</label>
-                        <input type="number" id="editUnit" step="0.01" oninput="calcEditTotal()">
+                        <input type="text" id="editUnit" inputmode="decimal">
                     </div>
                 </div>
 
                 <div class="grid-2">
                     <div class="field">
                         <label>Desconto (R$)</label>
-                        <input type="text" id="editDisc" inputmode="decimal" oninput="calcEditTotal()">
+                        <input type="text" id="editDisc" inputmode="decimal">
                     </div>
                     <div class="field">
                         <label>Total Final</label>
