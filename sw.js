@@ -1,4 +1,4 @@
-const CACHE_NAME = "granja-viana-pwa-v4";
+const CACHE_NAME = "granja-viana-pwa-v4.1";
 const APP_SHELL = [
   "./index.html",
   "./style.css",

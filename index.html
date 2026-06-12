@@ -238,12 +238,20 @@
     </section>
 
     <section id="page-cadastro" class="page" style="padding-bottom: 80px;">
-        <div class="grid-2">
-            <div class="card card-plantel" style="margin-bottom: 20px;">
-                <div class="card-header">
-                    <h2><i class="fas fa-kiwi-bird"></i> Gerenciamento do Plantel</h2>
-                </div>
-                <div style="padding: 10px;">
+        <!-- Navegação de sub-abas (visível apenas no mobile) -->
+        <div class="sub-tabs-cadastro">
+            <button class="sub-tab active" onclick="switchSubCadastro('sub-plantel', this)" data-icon="plantel">Plantel</button>
+            <button class="sub-tab" onclick="switchSubCadastro('sub-clientes', this)" data-icon="cliente">Clientes</button>
+            <button class="sub-tab" onclick="switchSubCadastro('sub-produtos', this)" data-icon="produto">Produtos</button>
+            <button class="sub-tab" onclick="switchSubCadastro('sub-insumos', this)" data-icon="insumo">Insumos</button>
+        </div>
+
+        <div class="grid-2 cadastro-tabs-container">
+            <!-- Sub-página: Plantel -->
+            <div id="sub-plantel" class="sub-page-cadastro active">
+                <div class="card card-plantel" style="margin-bottom: 20px;">
+                    <div class="card-header"><h2>Gerenciamento do Plantel</h2></div>
+                    <div style="padding: 10px;">
                     <div class="grid-2">
                         <div class="field">
                             <label for="plantel-inicial">Inicial (0-6 sem.)</label>
@@ -278,6 +286,10 @@
                     </div>
                 </div>
             </div>
+            </div>
+
+            <!-- Sub-página: Clientes -->
+            <div id="sub-clientes" class="sub-page-cadastro">
             <form class="card" id="clientForm">
                 <div class="card-header"><h2>Novo Cliente</h2></div>
                 <div class="field">
@@ -297,7 +309,10 @@
                 <button class="btn primary full" type="submit">Salvar Cliente</button>
                 <div class="list" id="clientList" style="margin-top:15px"></div>
             </form>
+            </div>
 
+            <!-- Sub-página: Produtos -->
+            <div id="sub-produtos" class="sub-page-cadastro">
             <form class="card" id="productForm">
                 <div class="card-header"><h2>Novo Produto</h2></div>
                 <div class="field">
@@ -335,7 +350,10 @@
                 <button class="btn primary full" type="submit" style="margin-top: 10px;">Salvar Produto</button>
                 <div class="list" id="productList" style="margin-top:15px"></div>
             </form>
+            </div>
 
+            <!-- Sub-página: Insumos -->
+            <div id="sub-insumos" class="sub-page-cadastro">
             <form class="card" id="insumoForm">
                 <div class="card-header"><h2>Cadastrar Insumo</h2></div>
                 

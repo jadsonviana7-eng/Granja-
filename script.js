@@ -285,6 +285,26 @@ function makeHeaderIcon(name) {
     return `<span class="header-icon">${iconSvg(name)}</span>`;
 }
 
+function switchSubCadastro(id, btn) {
+    // Remove a classe 'active' de todas as sub-páginas e botões na aba Dados
+    document.querySelectorAll('.sub-page-cadastro').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.sub-tab').forEach(b => b.classList.remove('active'));
+    
+    // Ativa a sub-página e o botão selecionado
+    document.getElementById(id)?.classList.add('active');
+    btn.classList.add('active');
+}
+
+function renderSubTabsIcons() {
+    document.querySelectorAll('.sub-tab').forEach(btn => {
+        const iconName = btn.dataset.icon;
+        if (iconName) {
+            const label = btn.textContent.trim();
+            btn.innerHTML = `${iconSvg(iconName)}<span>${esc(label)}</span>`;
+        }
+    });
+}
+
 function decorateCardHeaders() {
     const pairs = [
         ["Nova Venda", "venda"],
@@ -357,6 +377,7 @@ function render() {
     renderPlantel();
     renderDashboard();
     renderUsers();
+    renderSubTabsIcons();
     updateExpenseInsumoFields();
     toggleUnitIndicator();
 }

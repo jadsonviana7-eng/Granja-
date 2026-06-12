@@ -55,12 +55,12 @@
  
         .header-titles h1 {
             margin: 0;
-            font-size: 2rem;
+            font-size: 1.7rem;
             line-height: 0.8;
         }
  
         .sub-title {
-            font-size: 1.3rem;
+            font-size: 1.0rem;
             text-transform: uppercase;
             letter-spacing: 1px;
             color: var(--muted);
@@ -224,7 +224,7 @@
         .summary-card b { font-size: 1.1rem; }
  
         .stock-panel { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
-        .stock-card { border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); padding: 14px; box-shadow: 0 8px 22px rgba(23,32,51,.06); }
+        .stock-card { border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); padding: 14px; box-shadow: 0 8px 22px rgba(23,32,51,.06); text-align: center; }
         .stock-card small { display: block; color: var(--muted); font-size: .60rem; font-weight: 800; text-transform: uppercase; }
         .stock-card b { display: block; margin-top: 7px; font-size: 1.55rem; line-height: 1; }
         .stock-card span { display: block; margin-top: 7px; color: var(--muted); font-size: .74rem; font-weight: 700; }
@@ -1081,6 +1081,22 @@ canvas {
         flex-direction: column;
         justify-content: center;
     }
+
+    .modal-overlay {
+        padding: 0;
+    }
+    .modal-content {
+        max-width: 100%;
+        height: 100vh;
+        max-height: 100vh;
+        border-radius: 0;
+    }
+    .modal-content .card-header {
+        border-radius: 0 !important;
+    }
+    .modal-footer {
+        border-radius: 0;
+    }
 }
 
 .btn-link {
@@ -1093,15 +1109,64 @@ canvas {
     text-decoration: underline;
 }
 
+/* ─── SUB-NAVEGAÇÃO DE CADASTROS (MOBILE) ─── */
+.sub-tabs-cadastro { display: none; }
+
+@media (max-width: 820px) {
+    .sub-tabs-cadastro {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        margin-bottom: 15px;
+        overflow: hidden;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+    }
+    .sub-tab {
+        background: transparent;
+        border: none;
+        padding: 8px 2px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        font-size: 0.7rem;
+        font-weight: 800;
+        color: var(--muted);
+        text-transform: uppercase;
+        border-bottom: 3px solid transparent;
+        transition: 0.2s;
+    }
+
+    .sub-tab svg {
+        width: 20px;
+        height: 20px;
+    }
+    .sub-tab.active {
+        color: var(--blue);
+        background: var(--surface-2);
+        border-bottom-color: var(--blue);
+    }
+    .sub-page-cadastro { display: none; }
+    .sub-page-cadastro.active { display: block; }
+}
+
+/* No Desktop, garante que tudo apareça */
+@media (min-width: 821px) {
+    .sub-page-cadastro { display: block !important; }
+}
+
 .user-info-top {
     position: absolute;
-    right: 0px;
-    top: 20px;
+    right: -5px;
+    top: 0px;
     display: flex;
     align-items: center; 
     flex-direction: row-reverse; /* Inverte para o botão ficar à esquerda da foto */
     gap: 12px;
-    padding-right: 20px;
+    padding-right: 8px;
 }
 
 /* Ajuste para o canto superior direito apenas em telas grandes (Desktop) */
