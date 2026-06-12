@@ -9,8 +9,11 @@ const types = {
   ".html": "text/html; charset=utf-8",
   ".css": "text/css; charset=utf-8",
   ".js": "text/javascript; charset=utf-8",
+  ".json": "application/json; charset=utf-8",
   ".png": "image/png",
-  ".webmanifest": "application/manifest+json; charset=utf-8"
+  ".ico": "image/x-icon",
+  ".webmanifest": "application/manifest+json; charset=utf-8",
+  ".svg": "image/svg+xml"
 };
 
 const server = http.createServer((req, res) => {
@@ -34,12 +37,13 @@ const server = http.createServer((req, res) => {
 
     res.writeHead(200, {
       "Content-Type": types[path.extname(filePath)] || "application/octet-stream",
-      "Cache-Control": "no-cache"
+      "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0",
+      "Access-Control-Allow-Origin": "*"
     });
     res.end(data);
   });
 });
 
-server.listen(port, "127.0.0.1", () => {
+server.listen(port, "0.0.0.0", () => {
   console.log(`Granja PWA em http://localhost:${port}`);
 });

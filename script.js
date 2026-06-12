@@ -1,5 +1,9 @@
-const CLOUD_URL = "https://script.google.com/macros/s/AKfycbxZG-L7s932UnGNn-OA9FV3R2KKrvfybIvR6pH50G3GQkcCyvl8WDkU_IW0GiiU_YOoZA/exec";
-const STORE_KEY = "granjaViana_v2_final";
+// Configurações do Supabase
+const SUPABASE_URL = "https://kbmvwzzdisvefkseztua.supabase.co";
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtibXZ3enpkaXN2ZWZrc2V6dHVhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODExNDg1NzEsImV4cCI6MjA5NjcyNDU3MX0.9PQuzAC_oxsjM5MnWw_f9a_9B-WpgfWe2IPhogiRGnQ";
+let supabaseClient = null; // Renomeado para evitar conflito com a global da biblioteca
+
+const STORE_KEY = "granjaViana_supabase_cache";
 const today = new Date().toISOString().slice(0, 10);
 
 // ─── Estado do período financeiro ───────────────────────────────────────────
@@ -16,24 +20,28 @@ const FEED_PHASES = {
     postura: { label: "Postura", consumoKgDia: 0.12 }
 };
 
+const DEFAULT_AVATAR = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23ccc'%3E%3Cpath d='M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z'/%3E%3C/svg%3E";
+
 const LEGACY_PHASES = {
     cria: "inicial",
     recria: "crescimento"
 };
 
 const tabs = [
-    ["page-visao-geral", "Visão Geral"],
-    ["page-venda", "Financeiro"],
-    ["page-producao", "Produção"],
-    ["page-cadastro", "Cadastros"],
-    ["page-dados", "Dados"]
+    ["page-visao-geral", "Início", "dashboard"],
+    ["page-venda", "Vendas", "venda"],
+    ["page-producao", "Produção", "producao"],
+    ["page-cadastro", "Dados", "cadastro"],
+    ["page-configuracoes", "Ajustes", "config"]
 ];
 
 let db = loadDb();
 let activeCharts = {};
+let currentUser = null;
 let currentEditingProductId = null;
 let currentEditingClientId = null;
 let currentEditingInsumoId = null;
+let currentEditingUserId = null;
 
 function loadDb() {
     const raw = localStorage.getItem(STORE_KEY);
@@ -58,6 +66,7 @@ function normalizeDatabase(data) {
     data.clientes = Array.isArray(data.clientes) ? data.clientes : [];
     data.produtos = Array.isArray(data.produtos) ? data.produtos : [];
     data.historico = Array.isArray(data.historico) ? data.historico : [];
+    data.usuarios = Array.isArray(data.usuarios) ? data.usuarios : [];
     data.coletas = Array.isArray(data.coletas) ? data.coletas : [];
     data.config = data.config || {};
     data.config.plantel = normalizePlantel(data.config.plantel || {});
@@ -115,7 +124,7 @@ function normalizeProduto(produto) {
 
     return {
         ...produto,
-        preco: Number(produto.preco) || 0,
+        preco: Number(produto.preco ?? produto.preco_padrao ?? 0) || 0,
         tipoOvo: normalizeEggType(produto.tipoOvo || produto.tipo || produto.productType || "Grande"),
         ovosPorItem: Number(produto.ovosPorItem || produto.ovos || produto.productEggs) || 0,
         composicao: Array.isArray(comp) ? comp : []
@@ -150,7 +159,8 @@ function normalizeHistorico(item) {
         ...item,
         id: item.id || Date.now() + Math.random(),
         data: dateToISO(item.data) || today,
-        valor: Number(item.valor) || 0,
+        valor: Number(item.valor ?? item.valor_total ?? 0) || 0,
+        valorUnitario: Number(item.valorUnitario ?? item.valor_unitario ?? 0) || 0,
         qtd: Number(item.qtd ?? item.quantidade ?? 0) || 0,
         dataPagamento: item.dataPagamento || item.Datapagamento || item.datapagamento || "",
         status: status
@@ -161,7 +171,6 @@ function normalizeHistorico(item) {
 function save() {
     localStorage.setItem(STORE_KEY, JSON.stringify(db));
     render();
-    if (typeof syncToCloud === 'function') syncToCloud();
 }
 
 function esc(str) {
@@ -220,24 +229,56 @@ function getPhaseLabel(fase) {
 }
 
 function deleteIcon() {
-    return `<svg aria-hidden="true" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg>`;
+    return `<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.0" stroke-linecap="round" stroke-linejoin="round" style="width: 1.5rem; height: 1.5rem;"><path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" /></svg>`;
 }
 
 function iconSvg(name) {
     const icons = {
-        venda: '<path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7H14a3.5 3.5 0 0 1 0 7H6"/>',
-        despesa: '<path d="M16 3h5v5"/><path d="m21 3-7 7"/><path d="M8 21H3v-5"/><path d="m3 21 7-7"/>',
-        producao: '<path d="M12 3c4 0 7 4 7 9 0 6-3 9-7 9s-7-3-7-9c0-5 3-9 7-9Z"/><path d="M9 12h6"/>',
-        historico: '<path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 3v6h6"/><path d="M12 7v5l3 2"/>',
-        extrato: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/><path d="M8 13h8M8 17h5"/>',
-        plantel: '<path d="M7 20h10"/><path d="M12 20V9"/><path d="M8 9c0-3 2-5 4-5s4 2 4 5c0 2-1 4-4 4s-4-2-4-4Z"/>',
-        cliente: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M19 8v6M22 11h-6"/>',
-        produto: '<path d="m21 16-9 5-9-5V8l9-5 9 5Z"/><path d="m3.3 7.6 8.7 5 8.7-5"/><path d="M12 22V12"/>',
-        insumo: '<path d="M10 2v7.3L4.2 19A2 2 0 0 0 6 22h12a2 2 0 0 0 1.8-3L14 9.3V2"/><path d="M8 2h8"/><path d="M7 16h10"/>',
-        dados: '<path d="M12 2v20"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7H14a3.5 3.5 0 0 1 0 7H6"/>',
-        editar: '<path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/><path d="m15 5 4 4"/>'
+        // Painel Geral / Dashboard (Casa minimalista)
+        dashboard: '<path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/>',
+        
+        // Vendas / Faturamento (Sacola de compras moderna)
+        venda: '<path d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"/>',
+        
+        // Produção Diária (Ovo em base curva estilizada - Rancho do Viana)
+        // Nota: Esta regra usa uma espessura de traço sutil para manter a harmonia do formato do ovo
+        producao: '<path d="M12 22c3.314 0 6-3.134 6-7 0-4.418-2.686-8-6-8s-6 3.582-6 8c0 3.866 2.686 7 6 7z" stroke-width="1.0"/><path d="M5 19c2 1.5 5 2 7 2s5-.5 7-2" stroke-width="1.0"/>',
+        
+        // Cadastro de Clientes e Insumos (Prancheta com linhas de check)
+        cadastro: '<path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/>',
+        
+        // Configurações (Engrenagem com miolo circular)
+        config: '<path d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><circle cx="12" cy="12" r="3"/>',
+        
+        // Despesas (Gráfico Circular com Cifrão centralizado)
+        despesa: '<path d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V6m0 2c-1.11 0-2.08.402-2.599 1M12 14c1.11 0 2.08.402 2.599 1M12 14v2m0-2c-1.11 0-2.08.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>',
+        
+        // Histórico / Extrato (Relógio com ponteiros de contagem fluida)
+        historico: '<path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>',
+        
+        // Ações de Edição (Caneta moderna inclinada)
+        editar: '<path d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10" />',
+
+        // Novos ícones para os cabeçalhos
+        extrato: '<path d="M9 12h6m-6 4h6m2 5H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5.586a1 1 0 0 1 .707.293l5.414 5.414a1 1 0 0 1 .293.707V19a2 2 0 0 1-2 2z" /><path d="M12 3v6h6" />',
+        
+        plantel: '<path stroke-linecap="round" stroke-linejoin="round" d="M10.5 6h9.75M10.5 6a1.5 1.5 0 1 1-3 0m3 0a1.5 1.5 0 1 0-3 0M3.75 6H7.5m3 12h9.75m-9.75 0a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m-3.75 0H7.5m9-6h3.75m-3.75 0a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m-9.75 0h9.75" />',
+        
+        cliente: '<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>',
+        
+        produto: '<path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/>',
+        
+        insumo: '<path d="M10 2v7.5L4 19a2 2 0 0 0 2 3h12a2 2 0 0 0 2-3l-6-9.5V2h-4Z"/><path d="M8 2h8"/>',
+        
+        dados: '<path d="M12 10V3L4 14h7v7l8-11h-7z" />', // Raio/Energia para Sincronização
+        
+        usuarios: '<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>'
     };
-    return `<svg aria-hidden="true" viewBox="0 0 24 24">${icons[name] || icons.produto}</svg>`;
+
+    const targetIcon = icons[name] || icons.dashboard;
+
+    // Retorna a estrutura utilizando preenchimento invisível e contornos arredondados modernos (padrão Lucide/Heroicons)
+    return `<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.0" stroke-linecap="round" stroke-linejoin="round" style="display: inline-block; vertical-align: middle; width: 1.5rem; height: 1.5rem;">${targetIcon}</svg>`;
 }
 
 function makeHeaderIcon(name) {
@@ -258,6 +299,7 @@ function decorateCardHeaders() {
         ["Sincronização Nuvem", "dados"],
         ["Editar Lançamento", "editar"],
         ["Editar Cliente", "cliente"],
+        ["Editar Usuário", "usuarios"],
         ["Editar Insumo", "insumo"]
     ];
 
@@ -272,8 +314,8 @@ function decorateCardHeaders() {
 }
 
 function buildTabs() {
-    const html = tabs.map(([id, label]) => (
-        `<button class="tab-btn" data-page="${id}" onclick="showPage('${id}')">${esc(label)}</button>`
+    const html = tabs.map(([id, label, icon]) => (
+        `<button class="tab-btn" data-page="${id}" onclick="showPage('${id}')">${iconSvg(icon)}<span>${esc(label)}</span></button>`
     )).join("");
 
     const top = document.getElementById("topTabs");
@@ -314,6 +356,7 @@ function render() {
     renderColetas();
     renderPlantel();
     renderDashboard();
+    renderUsers();
     updateExpenseInsumoFields();
     toggleUnitIndicator();
 }
@@ -384,22 +427,32 @@ function renderDashboard() {
     };
 
     const currencyFormatter = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
+    const isMobile = window.innerWidth <= 768;
 
     const pieOptions = {
         responsive: true,
         maintainAspectRatio: false,
-        layout: { padding: { right: 110, left: 20, top: 10, bottom: 10 } },
+        layout: { 
+            padding: isMobile 
+                ? { top: 10, bottom: 10, left: 10, right: 10 } 
+                : { right: 110, left: 20, top: 10, bottom: 10 } 
+        },
         plugins: {
             legend: {
-                position: window.innerWidth < 600 ? 'bottom' : 'right',
-                align: 'center',
+                position: isMobile ? 'bottom' : 'right',
+                align: isMobile ? 'start' : 'center',
                 labels: {
-                    boxWidth: 12,
-                    padding: 20,
+                    boxWidth: isMobile ? 12 : 12,
+                    padding: isMobile ? 12 : 20,
+                    font: {
+                        size: isMobile ? 11 : 12,
+                        weight: isMobile ? '600' : 'normal'
+                    },
                     generateLabels: (chart) => {
                         const data = chart.data;
                         return data.labels.map((label, i) => ({
-                            text: `${label}: ${currencyFormatter.format(data.datasets[0].data[i])}`,
+                            // Transforma o texto em algo parecido com uma linha de tabela
+                            text: `${label.toUpperCase()}: ${currencyFormatter.format(data.datasets[0].data[i])}`,
                             fillStyle: data.datasets[0].backgroundColor[i], // Cor de fundo do quadradinho
                             strokeStyle: data.datasets[0].backgroundColor[i], // Cor da borda do quadradinho
                             lineWidth: 0,
@@ -696,6 +749,10 @@ function renderColetas() {
         })
         .sort((a, b) => dateToISO(b.data).localeCompare(dateToISO(a.data)));
 
+    const totalProduzido = coletasFiltradas.reduce((acc, item) => acc + (item.liquido || 0), 0);
+    const totalEl = document.getElementById("totalColetasMes");
+    if (totalEl) totalEl.textContent = `${totalProduzido.toLocaleString()} ovos`;
+
     let html = "";
     if (coletasFiltradas.length === 0) {
         html = '<div style="text-align:center; padding:20px; color:var(--muted);">Nenhuma coleta registrada neste mês.</div>';
@@ -941,6 +998,22 @@ function formatarCampoMoeda(e) {
     e.target.value = "R$ " + value;
 }
 
+function formatarCampoTelefone(e) {
+    let v = e.target.value.replace(/\D/g, "");
+    if (v.length > 11) v = v.substring(0, 11);
+    
+    if (v.length > 10) {
+        v = v.replace(/^(\d{2})(\d{5})(\d{4})/, "($1) $2-$3");
+    } else if (v.length > 6) {
+        v = v.replace(/^(\d{2})(\d{4})(\d{0,4})/, "($1) $2-$3");
+    } else if (v.length > 2) {
+        v = v.replace(/^(\d{2})(\d{0,4})/, "($1) $2");
+    } else if (v.length > 0) {
+        v = v.replace(/^(\d{0,2})/, "($1");
+    }
+    e.target.value = v;
+}
+
 function getValueFromMask(idOrElement) {
     const el = typeof idOrElement === 'string' ? document.getElementById(idOrElement) : idOrElement;
     if (!el) return 0;
@@ -963,6 +1036,16 @@ function setupCurrencyMasks() {
             if (!el.value || el.value === "0") el.value = money(0);
             // Adiciona o event listener para formatar e recalcular
             el.addEventListener("input", formatarCampoMoeda);
+        }
+    });
+}
+
+function setupPhoneMasks() {
+    const inputs = ["clientPhone", "editClientPhone", "profile-edit-phone"];
+    inputs.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+            el.addEventListener("input", formatarCampoTelefone);
         }
     });
 }
@@ -1034,7 +1117,7 @@ function toggleExpenseInstallments() {
     calculateExpenseTotal();
 }
 
-function handleSale(e) {
+async function handleSale(e) {
     e.preventDefault();
     const prodId = document.getElementById("saleProduct").value;
     const prod = db.produtos.find(p => String(p.id) === String(prodId));
@@ -1045,30 +1128,58 @@ function handleSale(e) {
     const unit = getValueFromMask("saleUnitValue");
     const disc = getValueFromMask("saleDiscount");
     const total = Math.max(0, (qty * unit) - disc);
-    const ovosVendidos = (prod.ovosPorItem || 0) * qty;
+    
+    const clienteNome = document.getElementById("saleClient").value || "Consumidor Geral";
+    const clienteObj = db.clientes.find(c => c.nome === clienteNome);
 
-    if (prod.tipoOvo && db.estoque[prod.tipoOvo] !== undefined) {
-        db.estoque[prod.tipoOvo] = (Number(db.estoque[prod.tipoOvo]) || 0) - ovosVendidos;
-    }
-
-    prod.composicao.forEach(item => {
-        const insumo = db.insumos.find(i => String(i.id) === String(item.insumoId));
-        if (insumo) insumo.qtd = (Number(insumo.qtd) || 0) - ((Number(item.qtdNecessaria) || 0) * qty);
-    });
-
-    db.historico.push({
-        id: Date.now(),
-        data: document.getElementById("saleDate").value || today,
+    const transacaoId = Date.now();
+    const payload = {
+        id: transacaoId,
+        data_transacao: document.getElementById("saleDate").value || today,
         tipo: "VENDA",
-        cliente: document.getElementById("saleClient").value || "Consumidor Geral",
-        produto: prod.nome,
-        qtd: qty,
-        valorUnitario: unit,
-        desconto: disc,
-        valor: total,
+        cliente_id: clienteObj ? clienteObj.id : null,
+        produto_id: prod.id,
+        quantidade: qty,
+        valor_unitario: unit,
+        desconto: disc || 0,
+        valor_total: total,
         descricao: document.getElementById("saleObs")?.value || "",
         status: document.getElementById("saleStatus").value,
-        dataPagamento: document.getElementById("saleStatus").value === "pago" ? today : ""
+        data_pagamento: document.getElementById("saleStatus").value === "pago" ? today : null
+    };
+
+    if (supabaseClient) {
+        const { error } = await supabaseClient.from('transacoes').insert(payload);
+        if (error) return toast("Erro ao salvar no banco: " + error.message);
+    }
+
+    if (prod.tipoOvo && db.estoque[prod.tipoOvo] !== undefined) {
+        db.estoque[prod.tipoOvo] -= (prod.ovosPorItem || 0) * qty;
+    }
+
+    // Desconta insumos da composição (local + banco)
+    const insumoUpdates = [];
+    prod.composicao.forEach(item => {
+        const insumo = db.insumos.find(i => String(i.id) === String(item.insumoId));
+        if (insumo) {
+            insumo.qtd = Math.max(0, (Number(insumo.qtd) || 0) - ((Number(item.qtdNecessaria) || 0) * qty));
+            insumoUpdates.push({ id: insumo.id, qtd: insumo.qtd });
+        }
+    });
+    if (supabaseClient && insumoUpdates.length > 0) {
+        insumoUpdates.forEach(async ({ id, qtd }) => {
+            await supabaseClient.from('insumos').update({ qtd }).eq('id', id);
+        });
+    }
+
+    db.historico.push({
+        ...payload,
+        id: transacaoId,
+        data: payload.data_transacao,
+        valor: payload.valor_total,
+        cliente: clienteNome,
+        produto: prod.nome,
+        dataPagamento: payload.data_pagamento || ""
     });
 
     save();
@@ -1081,17 +1192,27 @@ function handleSale(e) {
     toast("Venda registrada e estoques atualizados!");
 }
 
-function handleProduction(e) {
+async function handleProduction(e) {
     e.preventDefault();
     const type = document.getElementById("prodType").value;
+    const data = document.getElementById("prodDate").value || today;
     const coll = parseInt(document.getElementById("prodCollected").value, 10) || 0;
     const loss = parseInt(document.getElementById("prodLoss").value, 10) || 0;
     const liquido = coll - loss;
 
+    if (supabaseClient) {
+        const { error } = await supabaseClient.from('producao_diaria').insert({
+            data_coleta: data,
+            quantidade_ovos_bons: liquido,
+            quantidade_ovos_quebrados: loss
+        });
+        if (error) return toast("Erro no banco: " + error.message);
+    }
+
     db.estoque[type] = (Number(db.estoque[type]) || 0) + liquido;
     db.coletas.push({
         id: Date.now(),
-        data: document.getElementById("prodDate").value || today,
+        data: data,
         tipo: type,
         bruto: coll,
         perda: loss,
@@ -1105,7 +1226,7 @@ function handleProduction(e) {
     toast("Coleta salva!");
 }
 
-function handleExpense(e) {
+async function handleExpense(e) {
     e.preventDefault();
     const mode = document.getElementById("expenseMode").value;
     const insumoId = document.getElementById("expenseInsumo").value;
@@ -1118,24 +1239,42 @@ function handleExpense(e) {
     if (mode === "ESTOQUE") {
         if (!insumo) return toast("Selecione o insumo comprado.");
         insumo.qtd = (Number(insumo.qtd) || 0) + qtd;
+        if (supabaseClient) {
+            const { error: errEst } = await supabaseClient.from('insumos').update({ qtd: insumo.qtd }).eq('id', insumo.id);
+            if (errEst) console.warn("Erro ao atualizar estoque do insumo:", errEst.message);
+        }
+    }
+
+    const transacaoId = Date.now();
+    const payload = {
+        id: transacaoId,
+        data_transacao: document.getElementById("expenseDate").value || today,
+        tipo: "SAIDA",
+        quantidade: qtd,
+        valor_unitario: valorUnitario,
+        valor_total: valorTotal,
+        descricao: document.getElementById("expenseDesc").value || (insumo ? `Compra de ${insumo.nome}` : "Despesa"),
+        status: "pago",
+        data_pagamento: today
+    };
+
+    if (supabaseClient) {
+        const { error } = await supabaseClient.from('transacoes').insert(payload);
+        if (error) return toast("Erro no banco: " + error.message);
     }
 
     db.historico.push({
-        id: Date.now(),
-        data: document.getElementById("expenseDate").value || today,
-        tipo: "SAIDA",
+        ...payload,
+        id: transacaoId,
+        data: payload.data_transacao,
+        valor: payload.valor_total,
         categoria: mode === "ESTOQUE" ? "INSUMO" : "DESPESA",
-        descricao: document.getElementById("expenseDesc").value || (insumo ? `Compra de ${insumo.nome}` : "Despesa"),
         insumo: mode === "ESTOQUE" && insumo ? insumo.nome : "",
         insumoId: mode === "ESTOQUE" && insumo ? insumo.id : "",
-        qtd,
         unidade: mode === "ESTOQUE" && insumo ? getInsumoUnit(insumo) : "",
-        valorUnitario,
-        valor: valorTotal,
         formaPagamento: document.getElementById("expensePaymentMethod").value,
         parcelas: parseInt(document.getElementById("expenseInstallments")?.value, 10) || 1,
         vencimentoDia: document.getElementById("expenseDueDay")?.value || "",
-        status: "pago",
         dataPagamento: today
     });
 
@@ -1150,29 +1289,33 @@ function handleExpense(e) {
     toast(mode === "ESTOQUE" ? "Despesa registrada e estoque atualizado!" : "Despesa registrada!");
 }
 
-function handleInsumo(e) {
+async function handleInsumo(e) {
     e.preventDefault();
     const nome = document.getElementById("insumoName").value.trim();
     const tipoConsumo = document.getElementById("insumoTipoConsumo").value;
     const qtd = parseFloat(document.getElementById("insumoQtyInitial").value) || 0;
+    const unidade = tipoConsumo === "GERAL" ? "un" : "kg";
 
     if (!nome) return toast("Informe o nome do insumo!");
 
-    db.insumos.push({
-        id: Date.now(),
-        nome,
-        qtd,
-        tipoConsumo,
-        unidade: tipoConsumo === "GERAL" ? "un" : "kg"
-    });
+    const id = Date.now();
+
+    if (supabaseClient) {
+        const { error } = await supabaseClient.from('insumos').insert({
+            id, nome, tipo_consumo: tipoConsumo, qtd, unidade
+        });
+        if (error) return toast("Erro no banco: " + error.message);
+    }
+
+    db.insumos.push({ id, nome, qtd, tipoConsumo, unidade });
 
     save();
     e.target.reset();
     toggleUnitIndicator();
-    toast(`Insumo cadastrado: ${formatNumber(qtd)} ${tipoConsumo === "GERAL" ? "un" : "kg"}.`);
+    toast(`Insumo cadastrado: ${formatNumber(qtd)} ${unidade}.`);
 }
 
-function handleInsumoEdit(e) {
+async function handleInsumoEdit(e) {
     e.preventDefault();
     const id = parseInt(document.getElementById("editInsumoId").value, 10);
     const index = db.insumos.findIndex(i => i.id === id);
@@ -1183,24 +1326,42 @@ function handleInsumoEdit(e) {
 
     const tipoConsumo = document.getElementById("editInsumoTipo").value;
     const qtd = parseFloat(document.getElementById("editInsumoQty").value) || 0;
+    const unidade = tipoConsumo === "GERAL" ? "un" : "kg";
+
+    if (supabaseClient) {
+        const { error } = await supabaseClient.from('insumos').update({
+            nome, tipo_consumo: tipoConsumo, qtd, unidade
+        }).eq('id', id);
+        if (error) return toast("Erro ao atualizar no banco: " + error.message);
+    }
 
     db.insumos[index].nome = nome;
     db.insumos[index].tipoConsumo = tipoConsumo;
     db.insumos[index].qtd = qtd;
-    db.insumos[index].unidade = tipoConsumo === "GERAL" ? "un" : "kg";
+    db.insumos[index].unidade = unidade;
 
     save();
     closeInsumoEditModal();
     toast("Insumo atualizado com sucesso!");
 }
 
-function handleClient(e) {
+async function handleClient(e) {
     e.preventDefault();
     const nome = document.getElementById("clientName").value.trim();
     if (!nome) return toast("Informe o nome do cliente!");
 
+    const telefone = document.getElementById("clientPhone").value.trim();
+    const cidade   = document.getElementById("clientCity").value.trim();
+
+    let id = Date.now();
+    if (supabaseClient) {
+        const { data, error } = await supabaseClient.from('clientes').insert({ nome, telefone, cidade }).select();
+        if (error) return toast("Erro no banco: " + error.message);
+        if (data) id = data[0].id;
+    }
+
     db.clientes.push({
-        id: Date.now(),
+        id: id,
         nome,
         telefone: document.getElementById("clientPhone").value.trim(),
         cidade: document.getElementById("clientCity").value.trim()
@@ -1211,7 +1372,7 @@ function handleClient(e) {
     toast("Cliente salvo!");
 }
 
-function handleClientEdit(e) {
+async function handleClientEdit(e) {
     e.preventDefault();
     const id = parseInt(document.getElementById("editClientId").value, 10);
     const index = db.clientes.findIndex(c => c.id === id);
@@ -1220,20 +1381,30 @@ function handleClientEdit(e) {
     const novoNome = document.getElementById("editClientName").value.trim();
     if (!novoNome) return toast("O nome é obrigatório!");
 
-    db.clientes[index].nome = novoNome;
-    db.clientes[index].telefone = document.getElementById("editClientPhone").value.trim();
-    db.clientes[index].cidade = document.getElementById("editClientCity").value.trim();
+    const novoTelefone = document.getElementById("editClientPhone").value.trim();
+    const novaCidade   = document.getElementById("editClientCity").value.trim();
+
+    if (supabaseClient) {
+        const { error } = await supabaseClient.from('clientes').update({
+            nome: novoNome, telefone: novoTelefone, cidade: novaCidade
+        }).eq('id', id);
+        if (error) return toast("Erro ao atualizar no banco: " + error.message);
+    }
+
+    db.clientes[index].nome     = novoNome;
+    db.clientes[index].telefone = novoTelefone;
+    db.clientes[index].cidade   = novaCidade;
 
     save();
     closeClientEditModal();
     toast("Cliente atualizado com sucesso!");
 }
 
-function handleProduct(e) {
+async function handleProduct(e) {
     e.preventDefault();
     const nome = document.getElementById("productName").value.trim();
     if (!nome) return toast("Informe o nome do produto!");
-
+    const preco = parseFloat(document.getElementById("productPrice").value) || 0;
     const composicao = [];
     document.querySelectorAll(".insumo-comp-qty").forEach(input => {
         const valor = parseFloat(input.value) || 0;
@@ -1242,14 +1413,23 @@ function handleProduct(e) {
         }
     });
 
-    db.produtos.push({
-        id: Date.now(),
-        nome,
-        preco: parseFloat(document.getElementById("productPrice").value) || 0,
-        tipoOvo: normalizeEggType(document.getElementById("productType").value),
-        ovosPorItem: parseInt(document.getElementById("productEggs").value, 10) || 0,
-        composicao
-    });
+    const tipoOvo     = normalizeEggType(document.getElementById("productType").value);
+    const ovosPorItem = parseInt(document.getElementById("productEggs").value, 10) || 0;
+
+    let id = Date.now();
+    if (supabaseClient) {
+        const { data, error } = await supabaseClient.from('produtos').insert({
+            nome,
+            preco_padrao:  preco,
+            tipo_ovo:      tipoOvo,
+            ovos_por_item: ovosPorItem,
+            composicao:    composicao
+        }).select();
+        if (error) return toast("Erro no banco: " + error.message);
+        if (data) id = data[0].id;
+    }
+
+    db.produtos.push({ id, nome, preco, tipoOvo, ovosPorItem, composicao });
 
     save();
     e.target.reset();
@@ -1258,7 +1438,7 @@ function handleProduct(e) {
     toast("Produto cadastrado com sucesso!");
 }
 
-function handleProductEdit(e) {
+async function handleProductEdit(e) {
     e.preventDefault();
     const id = parseInt(document.getElementById("editProdId").value, 10);
     const index = db.produtos.findIndex(p => p.id === id);
@@ -1271,12 +1451,29 @@ function handleProductEdit(e) {
             composicao.push({ insumoId: String(input.dataset.id), qtdNecessaria: valor });
         }
     });
+    
+    const novoNome = document.getElementById("editProdName").value.trim();
+    const novoPreco = getValueFromMask("editProdPrice");
 
-    db.produtos[index].nome = document.getElementById("editProdName").value.trim();
-    db.produtos[index].preco = getValueFromMask("editProdPrice");
-    db.produtos[index].tipoOvo = normalizeEggType(document.getElementById("editProdType").value);
-    db.produtos[index].ovosPorItem = parseInt(document.getElementById("editProdEggs").value, 10) || 0;
-    db.produtos[index].composicao = composicao;
+    const novoTipoOvo     = normalizeEggType(document.getElementById("editProdType").value);
+    const novosOvos       = parseInt(document.getElementById("editProdEggs").value, 10) || 0;
+
+    if (supabaseClient) {
+        const { error } = await supabaseClient.from('produtos').update({
+            nome:          novoNome,
+            preco_padrao:  novoPreco,
+            tipo_ovo:      novoTipoOvo,
+            ovos_por_item: novosOvos,
+            composicao:    composicao
+        }).eq('id', id);
+        if (error) return toast("Erro ao atualizar no banco: " + error.message);
+    }
+
+    db.produtos[index].nome        = novoNome;
+    db.produtos[index].preco       = novoPreco;
+    db.produtos[index].tipoOvo     = novoTipoOvo;
+    db.produtos[index].ovosPorItem = novosOvos;
+    db.produtos[index].composicao  = composicao;
 
     save();
     closeProductEditModal();
@@ -1285,7 +1482,14 @@ function handleProductEdit(e) {
 
 function saveGalinhas() {
     document.querySelectorAll(".plantel-input").forEach(input => {
-        db.config.plantel[input.dataset.fase] = Math.max(0, parseInt(input.value, 10) || 0);
+        const fase = input.dataset.fase;
+        const qtd = Math.max(0, parseInt(input.value, 10) || 0);
+        db.config.plantel[fase] = qtd;
+
+        if (supabaseClient) {
+            supabaseClient.from('plantel').upsert({ fase, quantidade_aves: qtd }, { onConflict: 'fase' })
+                .then(({ error }) => { if (error) console.error("Erro ao salvar fase " + fase + ":", error); });
+        }
     });
 
     save();
@@ -1364,14 +1568,27 @@ function processarConsumoRacao() {
     }
 }
 
-function deleteItem(collection, id) {
+async function deleteItem(collection, id) {
     if (!Array.isArray(db[collection])) return;
     
     // Busca o item antes de deletar para poder estornar o estoque
     const itemParaExcluir = db[collection].find(item => item.id === id);
     if (!itemParaExcluir) return;
 
-    if (!confirm("Excluir este item? O estoque será ajustado automaticamente.")) return;
+    if (!confirm("Excluir este item? O estoque será ajustado automaticamente.")) return toast("Operação cancelada.");
+
+    if (supabaseClient) {
+        const tableMap = {
+            historico: 'transacoes',
+            coletas:   'producao_diaria',
+            clientes:  'clientes',
+            produtos:  'produtos',
+            insumos:   'insumos'
+        };
+        const table = tableMap[collection]; // Garante que a tabela mapeada seja usada
+        const { error } = await supabaseClient.from(table).delete().eq('id', id);
+        if (error) return toast("Erro ao excluir no banco: " + error.message);
+    }
 
     // --- LÓGICA DE ESTORNO PARA PRODUÇÃO (COLETAS) ---
     if (collection === 'coletas') {
@@ -1408,11 +1625,25 @@ function openEditModal(id) {
     document.getElementById("editTotal").value = money(item.valor || 0);
     document.getElementById("editStatus").value = item.status || "pago";
     document.getElementById("editObs").value = item.descricao || "";
+    document.getElementById("editPaymentDate").value = item.dataPagamento || "";
+    togglePaymentDateField();
     document.getElementById("editModal").style.display = "flex";
 }
 
 function closeEditModal() {
     document.getElementById("editModal").style.display = "none";
+}
+
+function togglePaymentDateField() {
+    const statusSelect = document.getElementById("editStatus");
+    const paymentDateField = document.getElementById("editPaymentDate");
+    if (!statusSelect || !paymentDateField) return;
+
+    // Busca o container pai (.field) para esconder a legenda e o input
+    const field = paymentDateField.closest('.field');
+    if (field) {
+        field.style.display = statusSelect.value === "pago" ? "block" : "none";
+    }
 }
 
 function calcEditTotal() {
@@ -1422,19 +1653,19 @@ function calcEditTotal() {
     document.getElementById("editTotal").value = money(Math.max(0, (q * u) - d));
 }
 
-function handleEdit(e) {
+async function handleEdit(e) {
     e.preventDefault();
     const id = parseFloat(document.getElementById("editId").value);
     const item = db.historico.find(h => h.id === id);
     if (!item) return;
 
     const newStatus = document.getElementById("editStatus").value;
+    let newPaymentDate = document.getElementById("editPaymentDate").value;
 
-    if (newStatus === "pago") {
-        if (!item.dataPagamento) item.dataPagamento = today;
-    } else {
-        item.dataPagamento = "";
-    }
+    if (newStatus === "pago" && !newPaymentDate) newPaymentDate = today;
+    else if (newStatus !== "pago") newPaymentDate = "";
+
+    item.dataPagamento = newPaymentDate;
 
     item.data = document.getElementById("editDate").value;
     item.qtd = parseFloat(document.getElementById("editQty").value) || 0;
@@ -1447,18 +1678,36 @@ function handleEdit(e) {
     if (item.tipo === "VENDA") item.cliente = document.getElementById("editCliente").value;
     if (item.tipo === "SAIDA" && !item.insumo) item.descricao = document.getElementById("editCliente").value;
 
+    if (supabaseClient) {
+        await supabaseClient.from('transacoes').update({
+            data_transacao: item.data,
+            quantidade: item.qtd,
+            valor_unitario: item.valorUnitario,
+            desconto: item.desconto,
+            valor_total: item.valor,
+            status: item.status,
+            descricao: item.descricao,
+            data_pagamento: item.dataPagamento || null
+        }).eq('id', id);
+    }
+
     save();
     closeEditModal();
     toast("Alterações salvas!");
 }
 
-function deleteCurrentItem() {
+async function deleteCurrentItem() {
     const id = parseFloat(document.getElementById("editId").value);
     const item = db.historico.find(h => h.id === id);
 
     if (!item) return;
 
     if (!confirm("Excluir permanentemente este lançamento? O estoque de ovos e insumos será estornado.")) return;
+
+    if (supabaseClient) {
+        const { error } = await supabaseClient.from('transacoes').delete().eq('id', id);
+        if (error) return toast("Erro ao excluir no banco!");
+    }
 
     // --- LÓGICA DE ESTORNO PARA VENDAS ---
     if (item.tipo === "VENDA") {
@@ -1481,6 +1730,7 @@ function deleteCurrentItem() {
                     if (insumoNoBanco) {
                         const qtdInsumoParaDevolver = (Number(comp.qtdNecessaria) || 0) * qtdVendida;
                         insumoNoBanco.qtd = (Number(insumoNoBanco.qtd) || 0) + qtdInsumoParaDevolver;
+                        if (supabaseClient) supabaseClient.from('insumos').update({ qtd: insumoNoBanco.qtd }).eq('id', insumoNoBanco.id);
                     }
                 });
             }
@@ -1679,6 +1929,335 @@ function atualizarBarra(p, t) {
     perc.innerText = `${p}%`;
     if (p >= 100) setTimeout(() => { container.style.display = "none"; }, 3000);
 }
+
+// ─── LÓGICA DE AUTENTICAÇÃO E PERFIS ─────────────────────────────────────────
+
+function toggleAuthMode(mode) {
+    const login = document.getElementById('login-form');
+    const signup = document.getElementById('signup-form');
+    const recovery = document.getElementById('recovery-form');
+    const title = document.getElementById('auth-title');
+
+    login.style.display = mode === 'login' ? 'block' : 'none';
+    signup.style.display = mode === 'signup' ? 'block' : 'none';
+    recovery.style.display = mode === 'recovery' ? 'block' : 'none';
+
+    if (mode === 'login') title.textContent = 'Entrar no Sistema';
+    if (mode === 'signup') title.textContent = 'Criar Conta';
+    if (mode === 'recovery') title.textContent = 'Recuperar Senha';
+}
+
+async function handleLogin(e) {
+    e.preventDefault();
+    const email = document.getElementById('login-email').value;
+    const password = document.getElementById('login-password').value;
+
+    const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
+    if (error) return toast("Erro no login: " + error.message);
+    
+    checkAuthState();
+}
+
+async function handleSignUp(e) {
+    e.preventDefault();
+    const email = document.getElementById('signup-email').value;
+    const password = document.getElementById('signup-password').value;
+    const name = document.getElementById('signup-name').value;
+
+    const { data, error } = await supabaseClient.auth.signUp({
+        email,
+        password,
+        options: { data: { full_name: name, role: 'common' } }
+    });
+
+    if (error) return toast("Erro no cadastro: " + error.message);
+    toast("Cadastro realizado! Verifique seu e-mail.");
+    toggleAuthMode('login');
+}
+
+async function handleLogout() {
+    if (!confirm("Deseja realmente sair?")) return;
+    await supabaseClient.auth.signOut();
+    location.reload();
+}
+
+let cropper = null;
+let tempAvatarBase64 = null; // Armazena a foto antes de salvar o formulário
+
+async function handlePhotoUpload(input) {
+    const file = input.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        const cropImage = document.getElementById('crop-image-preview');
+        
+        // O modal precisa estar visível para o Cropper calcular as dimensões corretamente
+        document.getElementById('cropModal').style.display = 'flex';
+        
+        cropImage.onload = () => {
+            if (cropper) cropper.destroy();
+            cropper = new Cropper(cropImage, {
+                aspectRatio: 1,
+                viewMode: 1,
+                autoCropArea: 1
+            });
+        };
+        cropImage.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+}
+
+async function confirmCrop() {
+    const canvas = cropper.getCroppedCanvas({ width: 256, height: 256 });
+    const base64Image = canvas.toDataURL('image/jpeg', 0.8);
+    
+    // Apenas guarda na variável e atualiza o preview do formulário
+    tempAvatarBase64 = base64Image;
+    
+    const regPreview = document.getElementById('profile-edit-preview');
+    if (regPreview) regPreview.src = base64Image;
+
+    const editPreview = document.getElementById('editUserPhotoPreview');
+    if (editPreview) editPreview.src = base64Image;
+
+    if(document.getElementById('user-display-photo')) document.getElementById('user-display-photo').src = base64Image;
+
+    toast("Foto preparada!");
+    cancelCrop();
+}
+
+function cancelCrop() {
+    document.getElementById('cropModal').style.display = 'none';
+    if (cropper) cropper.destroy();
+}
+
+function openUserEditModal(userId) {
+    const user = db.usuarios.find(u => u.id === userId);
+    if (!user) return;
+
+    currentEditingUserId = userId;
+    tempAvatarBase64 = null; // Reseta para não usar foto de um cadastro/edição anterior
+    document.getElementById("editUserId").value = user.id;
+    document.getElementById("editUserName").value = user.full_name;
+    document.getElementById("editUserPhone").value = user.phone || "";
+    document.getElementById("editUserRole").value = user.role || "common";
+    document.getElementById("editUserPhotoPreview").src = user.avatar_url || DEFAULT_AVATAR;
+
+    document.getElementById("userEditModal").style.display = "flex";
+}
+
+function closeUserEditModal() {
+    document.getElementById("userEditModal").style.display = "none";
+    currentEditingUserId = null;
+}
+
+async function handleUserEdit(e) {
+    e.preventDefault();
+    const id = document.getElementById("editUserId").value;
+    const full_name = document.getElementById("editUserName").value;
+    const phone = document.getElementById("editUserPhone").value;
+    const role = document.getElementById("editUserRole").value;
+
+    const updateData = { full_name, phone, role };
+    if (tempAvatarBase64) {
+        updateData.avatar_url = tempAvatarBase64;
+    }
+
+    try {
+        // 1. Atualiza a tabela pública 'usuarios'
+        const { error: dbError } = await supabaseClient
+            .from('usuarios')
+            .update(updateData)
+            .eq('id', id);
+
+        if (dbError) throw dbError;
+
+        // 2. Se estiver editando o próprio perfil, atualiza os metadados da sessão Auth
+        if (currentUser && id === currentUser.id) {
+            const authUpdate = { data: { full_name, phone, role } };
+            if (tempAvatarBase64) {
+                authUpdate.data.avatar_url = tempAvatarBase64;
+            }
+
+            const { error: authError } = await supabaseClient.auth.updateUser(authUpdate);
+            if (authError) console.warn("Erro ao sincronizar metadados Auth:", authError.message);
+        }
+
+        toast("Usuário atualizado com sucesso!");
+        closeUserEditModal();
+        
+        // Recarrega dados para atualizar a lista local e interface
+        loadFromSupabase();
+
+    } catch (error) {
+        console.error("Erro ao editar usuário:", error);
+        alert("Erro ao salvar alterações: " + error.message);
+    }
+}
+
+function renderUsers() {
+    const list = document.getElementById("user-list");
+    if (!list || !currentUser) return;
+
+    if (db.usuarios.length === 0) {
+        list.innerHTML = '<div class="hint-text" style="text-align:center; padding:10px;">Nenhum outro usuário encontrado.</div>';
+        return;
+    }
+
+    list.innerHTML = db.usuarios.map(u => {
+        const isMe = u.id === currentUser.id;
+        const roleLabel = u.role === 'admin' ? 'ADMINISTRADOR' : 'USUÁRIO';
+        const roleClass = u.role === 'admin' ? 'blue' : 'green';
+        
+        return `
+            <div class="item">
+                <div style="display: flex; align-items: center; gap: 12px;">
+                    <img src="${u.avatar_url || 'https://via.placeholder.com/40'}" class="user-avatar-small" style="width: 32px; height: 32px; border-width: 1px;">
+                    <div style="display: flex; flex-direction: column;">
+                        <b style="font-size: 0.9rem;">${esc(u.full_name)} ${isMe ? '(Você)' : ''}</b>
+                        <small style="color: var(--muted); font-size: 0.75rem;">${esc(u.email)}</small>
+                    </div>
+                </div>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <span class="badge ${roleClass}" style="font-size: 0.65rem; min-height: 22px; padding: 0 8px;">${roleLabel}</span>
+                    <button class="icon-btn blue" onclick="openUserEditModal('${u.id}')" title="Editar usuário">
+                        ${iconSvg('editar')}
+                    </button>
+                    ${!isMe ? `
+                        <button class="icon-btn danger" onclick="handleDeleteUser('${u.id}')" title="Remover acesso">
+                            ${deleteIcon()}
+                        </button>
+                    ` : ''}
+                </div>
+            </div>
+        `;
+    }).join("");
+}
+
+async function handleDeleteUser(userId) {
+    if (!confirm("Deseja realmente remover o acesso deste usuário?")) return;
+    const { error } = await supabaseClient.from('usuarios').delete().eq('id', userId);
+    if (error) return toast("Erro ao remover: " + error.message);
+    loadFromSupabase();
+}
+
+function toggleUserDropdown(event) {
+    event.stopPropagation();
+    const menu = document.getElementById('user-dropdown');
+    menu.classList.toggle('show');
+}
+
+window.addEventListener('click', () => {
+    document.getElementById('user-dropdown')?.classList.remove('show');
+});
+
+async function handleCreateUser(e) {
+    e.preventDefault();
+
+    if (window.location.protocol === 'file:') {
+        toast("ERRO: Use o arquivo abrir-pwa.bat para salvar dados.");
+        console.error("Protocolo file:// detectado.");
+        return;
+    }
+    
+    const name = document.getElementById('profile-edit-name').value;
+    const email = document.getElementById('profile-edit-email').value;
+    const password = document.getElementById('profile-edit-password').value;
+    const phone = document.getElementById('profile-edit-phone').value;
+    const role = document.getElementById('profile-edit-role').value;
+
+    // Cria o usuário no Supabase Auth
+    // Nota: Por padrão, o Supabase envia um e-mail de confirmação. 
+    const { data, error } = await supabaseClient.auth.signUp({
+        email,
+        password,
+        options: {
+            data: { 
+                full_name: name, 
+                phone: phone, 
+                role: role,
+                avatar_url: tempAvatarBase64 || DEFAULT_AVATAR
+            }
+        }
+    });
+
+    if (error) {
+        console.error("Erro Supabase Auth:", error);
+        alert("Erro ao cadastrar: " + error.message);
+        return;
+    }
+
+    toast("Usuário cadastrado com sucesso!");
+    
+    // Limpa o formulário e o estado temporário
+    e.target.reset();
+    tempAvatarBase64 = null;
+    document.getElementById('profile-edit-preview').src = DEFAULT_AVATAR;
+    
+    // Atualiza a lista de usuários imediatamente
+    loadFromSupabase();
+}
+
+async function checkAuthState() {
+    const { data: { user } } = await supabaseClient.auth.getUser();
+    const authScreen = document.getElementById('auth-screen');
+    const appContent = document.getElementById('app-content');
+
+    if (user) {
+        currentUser = user;
+        authScreen.style.display = 'none';
+        appContent.style.display = 'block';
+        
+        const name = user.user_metadata?.full_name || user.email;
+        const role = user.user_metadata?.role || 'common'; // admin ou common
+        const photo = user.user_metadata?.avatar_url || DEFAULT_AVATAR;
+        const phone = user.user_metadata?.phone || '';
+
+        document.getElementById('user-display-photo').src = photo;
+
+        document.getElementById('dropdown-name').textContent = name;
+        const dropRole = document.getElementById('dropdown-role');
+        dropRole.textContent = role === 'admin' ? 'ADMINISTRADOR' : 'USUÁRIO';
+        dropRole.className = `badge ${role === 'admin' ? 'blue' : 'green'}`;
+
+        applyRolePolicies(role);
+        loadFromSupabase();
+    } else {
+        authScreen.style.display = 'flex';
+        appContent.style.display = 'none';
+    }
+}
+
+function applyRolePolicies(role) {
+    const isAdmin = role === 'admin';
+    
+    // Elementos que apenas admin pode ver
+    document.querySelectorAll('.admin-only').forEach(el => {
+        el.style.display = isAdmin ? 'block' : 'none';
+    });
+
+    // Botões de exclusão e edição
+    document.querySelectorAll('.admin-only-edit').forEach(el => {
+        if (el.tagName === 'BUTTON' || el.tagName === 'INPUT') {
+            el.disabled = !isAdmin;
+        }
+        if (!isAdmin) {
+            el.style.opacity = '0.5';
+            el.title = "Acesso restrito ao administrador";
+        }
+    });
+
+    // Oculta botões de excluir em listas para usuários comuns
+    const style = document.createElement('style');
+    if (!isAdmin) {
+        style.innerHTML = `
+            .icon-btn.danger { display: none !important; }
+        `;
+    }
+    document.head.appendChild(style);
+}
+
 function createCloudPayload() {
     // Criamos uma cópia profunda e normalizada para o payload de sincronização
     const banco = normalizeDatabase(JSON.parse(JSON.stringify(db)));
@@ -1725,82 +2304,139 @@ function createCloudPayload() {
     };
 }
 
-async function syncToCloud() {
-    if (!CLOUD_URL) return;
-
-    atualizarBarra(10, "Preparando backup completo...");
-
-    try {
-        const payload = createCloudPayload(); // Sua função que gera o JSON complexo
-        
-        atualizarBarra(40, "Enviando dados estruturados...");
-
-        const response = await fetch(CLOUD_URL, {
-            method: "POST",
-            mode: "no-cors", // Necessário para evitar erros de CORS no Google Apps Script
-            headers: {
-                "Content-Type": "application/json"
-            },
-            body: JSON.stringify({
-                action: "syncFull",
-                data: payload
-            })
-        });
-
-        atualizarBarra(100, "Sincronização concluída!");
-        toast("✅ Backup completo salvo na planilha.");
-    } catch (error) {
-        console.error("Erro crítico na sincronização:", error);
-        atualizarBarra(0, "Falha no backup");
-        toast("❌ Erro ao salvar na nuvem.");
-    }
+async function syncToSupabase() {
+    // Agora as alterações são feitas diretamente nos handlers.
+    // Esta função pode ser usada para um backup completo opcional no futuro.
+    console.log("Sincronização individual direta habilitada.");
+    return;
 }
 
-async function loadFromCloud() {
-    if (!CLOUD_URL) return;
-
-    atualizarBarra(15, "Buscando dados na nuvem...");
-
+async function loadFromSupabase() {
+    if (!supabaseClient) return;
     try {
-        atualizarBarra(45, "Baixando backup...");
-        const response = await fetch(`${CLOUD_URL}?t=${Date.now()}`, {
-            method: "GET",
-            cache: "no-store"
+        // Busca todas as tabelas em paralelo
+        const [resTrans, resProd, resCli, resColetas, resInsumos, resUsers, resPlantel] = await Promise.all([
+            supabaseClient.from('transacoes').select('*'),
+            supabaseClient.from('produtos').select('*'),
+            supabaseClient.from('clientes').select('*'),
+            supabaseClient.from('producao_diaria').select('*'),
+            supabaseClient.from('insumos').select('*'),
+            supabaseClient.from('usuarios').select('*'),
+            supabaseClient.from('plantel').select('*')
+        ]);
+
+        if (resTrans.error) console.warn("Erro Transações:", resTrans.error);
+        if (resProd.error)  console.warn("Erro Produtos:", resProd.error);
+        if (resCli.error)   console.warn("Erro Clientes:", resCli.error);
+        if (resUsers.error) console.error("Erro ao carregar usuários:", resUsers.error);
+        if (resPlantel.error) console.warn("Erro Plantel:", resPlantel.error);
+
+        // Plantel
+        db.config.plantel = { inicial: 0, crescimento: 0, prePostura: 0, postura: 0 };
+        (resPlantel.data || []).forEach(p => {
+            const faseVindaDoBanco = String(p.fase || "");
+            const quantidade = Number(p.quantidade_aves) || 0;
+            
+            // Tenta encontrar a chave correspondente no nosso objeto (ignora maiúsculas/minúsculas)
+            const chaveCorreta = Object.keys(db.config.plantel).find(k => k.toLowerCase() === faseVindaDoBanco.toLowerCase());
+            if (chaveCorreta) {
+                db.config.plantel[chaveCorreta] = quantidade;
+            }
         });
 
-        if (!response.ok) throw new Error("Falha na conexão");
+        // Usuários
+        db.usuarios = (resUsers.data || []).map(u => ({
+            id: u.id,
+            full_name: u.full_name || 'Sem nome',
+            email: u.email,
+            role: u.role || 'common',
+            avatar_url: u.avatar_url
+        }));
 
-        const cloudData = await response.json();
-        db = normalizeDatabase(extractDatabaseFromCloud(cloudData));
+        // Clientes
+        db.clientes = (resCli.data || []).map(c => ({
+            id:       c.id,
+            nome:     c.nome,
+            telefone: c.telefone || '',
+            cidade:   c.cidade   || ''
+        }));
+
+        // Produtos
+        db.produtos = (resProd.data || []).map(p => normalizeProduto({
+            id:          p.id,
+            nome:        p.nome,
+            preco:       Number(p.preco_padrao) || 0,
+            tipoOvo:     p.tipo_ovo      || 'Grande',
+            ovosPorItem: p.ovos_por_item || 0,
+            composicao:  p.composicao    || []
+        }));
+
+        // Insumos
+        if (!resInsumos.error && resInsumos.data?.length > 0) {
+            db.insumos = resInsumos.data.map(i => normalizeInsumo({
+                id:          i.id,
+                nome:        i.nome,
+                tipoConsumo: i.tipo_consumo,
+                qtd:         Number(i.qtd) || 0,
+                unidade:     i.unidade || 'un'
+            }));
+        }
+
+        // Histórico de transações
+        db.historico = (resTrans.data || []).map(t => {
+            const cliente = (resCli.data || []).find(c => c.id === t.cliente_id);
+            const produto = (resProd.data || []).find(p => p.id === t.produto_id);
+            return normalizeHistorico({
+                id:            t.id,
+                data:          t.data_transacao,
+                tipo:          t.tipo,
+                cliente:       cliente?.nome || '',
+                produto:       produto?.nome || '',
+                cliente_id:    t.cliente_id,
+                produto_id:    t.produto_id,
+                qtd:           t.quantidade,
+                valorUnitario: Number(t.valor_unitario) || 0,
+                desconto:      Number(t.desconto) || 0,
+                valor:         Number(t.valor_total) || 0,
+                descricao:     t.descricao || '',
+                status:        t.status || 'pago',
+                dataPagamento: t.data_pagamento || ''
+            });
+        });
+
+        // Coletas de produção
+        if (!resColetas.error && resColetas.data) {
+            db.coletas = resColetas.data.map(c => normalizeColeta({
+                id:      c.id,
+                data:    c.data_coleta,
+                tipo:    c.tipo_ovo || 'Grande',
+                bruto:   (c.quantidade_ovos_bons || 0) + (c.quantidade_ovos_quebrados || 0),
+                perda:   c.quantidade_ovos_quebrados || 0,
+                liquido: c.quantidade_ovos_bons || 0
+            }));
+        }
+
+        // --- RECONSTRUÇÃO DO ESTOQUE DE OVOS ---
+        db.estoque = { Grande: 0, Medio: 0, Pequeno: 0 };
+        db.coletas.forEach(c => {
+            if (db.estoque[c.tipo] !== undefined) db.estoque[c.tipo] += c.liquido;
+        });
+        db.historico.forEach(h => {
+            if (h.tipo === "VENDA") {
+                const prod = db.produtos.find(p => p.nome === h.produto);
+                if (prod && prod.tipoOvo && db.estoque[prod.tipoOvo] !== undefined) {
+                    db.estoque[prod.tipoOvo] -= (prod.ovosPorItem * h.qtd);
+                }
+            }
+        });
+
         localStorage.setItem(STORE_KEY, JSON.stringify(db));
         render();
-        setDefaultDates();
-        atualizarBarra(100, "Dados restaurados!");
-        toast("Dados carregados da nuvem.");
+        toast("Dados carregados do Supabase!");
     } catch (error) {
-        console.error("Erro ao carregar:", error);
-        atualizarBarra(0, "Falha ao carregar");
-        toast("Não foi possível carregar da nuvem. Dados locais mantidos.");
+        console.error("Erro ao carregar dados do Supabase:", error);
+        toast("Supabase indisponível. Usando dados locais.");
     }
-}
-
-function extractDatabaseFromCloud(cloudData) {
-    if (!cloudData) return null;
-
-    // Se o dado vier de 'backupCompleto' ou direto da raiz
-    const d = cloudData.backupCompleto || cloudData;
-
-    return {
-        estoque: d.estoque || { Grande: 0, Medio: 0, Pequeno: 0 },
-        insumos: Array.isArray(d.insumos) ? d.insumos : [],
-        clientes: Array.isArray(d.clientes) ? d.clientes : [],
-        produtos: Array.isArray(d.produtos) ? d.produtos : [],
-        historico: Array.isArray(d.historico || d.extrato) ? (d.historico || d.extrato) : [],
-        coletas: Array.isArray(d.coletas || d.producao) ? (d.coletas || d.producao) : [],
-        config: {
-            plantel: d.config?.plantel || d.plantel || { inicial: 0, crescimento: 0, prePostura: 0, postura: 0 }
-        }
-    };
 }
 
 function rebuildEggStock(estoqueGeral) {
@@ -1854,6 +2490,9 @@ function bindForms() {
 
     document.getElementById("filterType")?.addEventListener("change", renderExtract);
     document.getElementById("filtroDataColeta")?.addEventListener("input", renderColetas);
+
+    // Adiciona o listener para atualizar a visibilidade da data ao mudar o status
+    document.getElementById("editStatus")?.addEventListener("change", togglePaymentDateField);
 }
 
 function configureRangePicker(selector, startVal, endVal, onUpdate) {
@@ -1913,17 +2552,43 @@ function setupExtratoPicker() {
     });
 }
 
-function init() {
+function agendarProximoConsumo() {
+    const agora = new Date();
+    const amanha = new Date(agora);
+    amanha.setDate(amanha.getDate() + 1);
+    amanha.setHours(0, 0, 1, 0); // 00:00:01 do próximo dia
+
+    const tempoAteMeiaNoite = amanha.getTime() - agora.getTime();
+    setTimeout(() => {
+        processarConsumoRacao();
+    }, tempoAteMeiaNoite);
+}
+
+async function init() {
+    // Inicializa o cliente Supabase aqui, garantindo que o SDK já está carregado
+    if (window.supabase && window.supabase.createClient) {
+        supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+        console.info("[Granja] Supabase conectado.");
+        
+        // Vincula formulários de auth
+        document.getElementById('login-form')?.addEventListener('submit', handleLogin);
+        document.getElementById('signup-form')?.addEventListener('submit', handleSignUp);
+        
+        checkAuthState();
+    } else {
+        console.warn("[Granja] SDK do Supabase não encontrado. Rodando offline.");
+    }
     buildTabs();
     decorateCardHeaders();
     bindForms();
     setupPwaInstallButton();
     setDefaultDates();
-    processarConsumoRacao();
+    await processarConsumoRacao();
     render();
     setupPeriodoPicker();
     setupExtratoPicker();
     setupCurrencyMasks();
+    setupPhoneMasks();
     showPage("page-visao-geral");
 }
 
@@ -1939,7 +2604,8 @@ document.addEventListener("DOMContentLoaded", init);
         });
     }
 
-if ("serviceWorker" in navigator) {
+const isLocalFile = window.location.protocol === 'file:';
+if ("serviceWorker" in navigator && !isLocalFile) {
     window.addEventListener("load", () => {
         navigator.serviceWorker.register("./sw.js").catch((error) => {
             console.warn("Service worker não registrado:", error);
@@ -1949,27 +2615,116 @@ if ("serviceWorker" in navigator) {
 
 let deferredInstallPrompt = null;
 
+// Captura o evento de instalação o mais cedo possível para evitar que o navegador o ignore
+window.addEventListener("beforeinstallprompt", (event) => {
+    // Impede o banner padrão automático (isso gera o aviso informativo no console)
+    event.preventDefault();
+    // Armazena o evento para ser usado quando o usuário clicar no seu botão "Instalar"
+    deferredInstallPrompt = event;
+    
+    // Mostra a seção de instalação na tela de login
+    const installSection = document.getElementById("pwa-install-section");
+    if (installSection) installSection.style.display = "block";
+});
+
 function setupPwaInstallButton() {
     const installButton = document.getElementById("installAppBtn");
+    const installSection = document.getElementById("pwa-install-section");
     if (!installButton) return;
-
-    window.addEventListener("beforeinstallprompt", (event) => {
-        event.preventDefault();
-        deferredInstallPrompt = event;
-        installButton.hidden = false;
-    });
 
     installButton.addEventListener("click", async () => {
         if (!deferredInstallPrompt) return;
-        installButton.hidden = true;
+        if (installSection) installSection.style.display = "none";
         deferredInstallPrompt.prompt();
         await deferredInstallPrompt.userChoice;
         deferredInstallPrompt = null;
     });
 
+    // Verifica se o evento já foi capturado globalmente antes desta função rodar
+    if (deferredInstallPrompt) {
+        if (installSection) installSection.style.display = "block";
+    }
+
     window.addEventListener("appinstalled", () => {
-        installButton.hidden = true;
+        if (installSection) installSection.style.display = "none";
         deferredInstallPrompt = null;
         toast("App instalado com sucesso!");
     });
+}
+
+async function dbSalvarTransacao(novaTransacao) {
+    if (!supabaseClient) return;
+
+    try {
+        let clienteId = null;
+        let produtoId = null;
+
+        // 1. Garante o cadastro do cliente se for uma VENDA
+        if (novaTransacao.tipo === 'VENDA' && novaTransacao.cliente) {
+            const { data: cli } = await supabaseClient.from('clientes')
+                .select('id').eq('nome', novaTransacao.cliente).maybeSingle();
+            
+            if (cli) {
+                clienteId = cli.id;
+            } else {
+                const { data: novoCli } = await supabaseClient.from('clientes')
+                    .insert({ nome: novaTransacao.cliente }).select().single();
+                clienteId = novoCli.id;
+            }
+        }
+
+        // 2. Garante o cadastro do produto/insumo
+        if (novaTransacao.produto) {
+            const { data: prod } = await supabaseClient.from('produtos')
+                .select('id').eq('nome', novaTransacao.produto).maybeSingle();
+            
+            if (prod) {
+                produtoId = prod.id;
+            } else {
+                const { data: novoProd } = await supabaseClient.from('produtos')
+                    .insert({ nome: novaTransacao.produto }).select().single();
+                produtoId = novoProd.id;
+            }
+        }
+
+        // 3. Insere a transação vinculando as chaves estrangeiras (IDs)
+        const objetoBanco = {
+            id: novaTransacao.id, // O ID gerado pelo app (timestamp longo)
+            data_transacao: novaTransacao.data,
+            tipo: novaTransacao.tipo,
+            cliente_id: clienteId,
+            produto_id: produtoId,
+            quantidade: novaTransacao.qtd,
+            valor_unitario: novaTransacao.valorUnitario,
+            desconto: novaTransacao.desconto,
+            valor_total: novaTransacao.valor,
+            descricao: novaTransacao.descricao,
+            status: novaTransacao.status,
+            data_pagamento: novaTransacao.dataPagamento || null
+        };
+
+        const { error } = await supabaseClient.from('transacoes').upsert(objetoBanco);
+        if (error) throw error;
+
+    } catch (error) {
+        console.error("Erro ao salvar transação no banco:", error);
+        toast("Erro ao salvar no servidor", "error");
+    }
+}
+
+async function dbSalvarColeta(novaColeta) {
+    if (!supabaseClient) return;
+
+    try {
+        const { error } = await supabaseClient.from('producao_diaria').upsert({
+            data_coleta: novaColeta.data,
+            quantidade_ovos_bons: novaColeta.bons,
+            quantidade_ovos_quebrados: novaColeta.quebrados,
+            observacoes: novaColeta.obs
+        });
+
+        if (error) throw error;
+    } catch (error) {
+        console.error("Erro ao salvar produção no banco:", error);
+    }
 }
