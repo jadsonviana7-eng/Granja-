@@ -1,0 +1,56 @@
+Tabela,Posição,Coluna,Tipo de Dado,Aceita Nulo,Valor Padrão
+clientes,1,id,bigint,NO,nextval('clientes_id_seq'::regclass)
+clientes,2,nome,character varying,NO,null
+clientes,3,created_at,timestamp with time zone,NO,"timezone('utc'::text, now())"
+clientes,4,telefone,text,YES,null
+clientes,5,cidade,text,YES,null
+estoque_produtos,1,produto_id,bigint,NO,null
+estoque_produtos,2,quantidade_disponivel,integer,NO,0
+estoque_produtos,3,ultima_atualizacao,timestamp with time zone,NO,"timezone('utc'::text, now())"
+granja_data,1,id,uuid,NO,gen_random_uuid()
+granja_data,2,user_id,uuid,YES,null
+granja_data,3,db_content,jsonb,NO,null
+granja_data,4,updated_at,timestamp with time zone,YES,"timezone('utc'::text, now())"
+insumos,1,id,bigint,NO,null
+insumos,2,nome,text,NO,null
+insumos,3,tipo_consumo,text,NO,'GERAL'::text
+insumos,4,qtd,numeric,NO,0
+insumos,5,unidade,text,NO,'un'::text
+insumos,6,created_at,timestamp with time zone,NO,"timezone('utc'::text, now())"
+plantel,1,id,bigint,NO,null
+plantel,2,fase,text,NO,null
+plantel,3,quantidade_aves,integer,NO,0
+plantel,4,created_at,timestamp with time zone,NO,"timezone('utc'::text, now())"
+producao_diaria,1,id,bigint,NO,nextval('producao_diaria_id_seq'::regclass)
+producao_diaria,2,data_coleta,date,NO,null
+producao_diaria,3,quantidade_ovos_bons,integer,NO,0
+producao_diaria,4,quantidade_ovos_quebrados,integer,NO,0
+producao_diaria,5,observacoes,text,YES,null
+producao_diaria,6,created_at,timestamp with time zone,NO,"timezone('utc'::text, now())"
+produtos,1,id,bigint,NO,nextval('produtos_id_seq'::regclass)
+produtos,2,nome,character varying,NO,null
+produtos,3,preco_padrao,numeric,YES,0.00
+produtos,4,created_at,timestamp with time zone,NO,"timezone('utc'::text, now())"
+produtos,5,tipo_ovo,text,NO,'Grande'::text
+produtos,6,ovos_por_item,integer,NO,0
+produtos,7,composicao,jsonb,YES,'[]'::jsonb
+transacoes,1,id,bigint,NO,null
+transacoes,2,data_transacao,date,NO,null
+transacoes,3,tipo,USER-DEFINED,NO,null
+transacoes,4,cliente_id,bigint,YES,null
+transacoes,5,produto_id,bigint,YES,null
+transacoes,6,quantidade,numeric,NO,1
+transacoes,7,valor_unitario,numeric,YES,0.00
+transacoes,8,desconto,numeric,YES,0.00
+transacoes,9,valor_total,numeric,NO,null
+transacoes,10,descricao,text,YES,null
+transacoes,11,status,USER-DEFINED,YES,'pendente'::status_pagamento
+transacoes,12,data_pagamento,date,YES,null
+transacoes,13,created_at,timestamp with time zone,NO,"timezone('utc'::text, now())"
+usuarios,1,id,uuid,NO,null
+usuarios,2,full_name,text,YES,null
+usuarios,3,email,text,YES,null
+usuarios,4,role,text,YES,'common'::text
+usuarios,5,avatar_url,text,YES,null
+usuarios,6,phone,text,YES,null
+usuarios,7,created_at,timestamp with time zone,NO,"timezone('utc'::text, now())"
