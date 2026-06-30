@@ -409,7 +409,7 @@
         }
 
         .list { display: grid; gap: 8px; }
-        .item { display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: center; border: 1px solid var(--line); border-radius: var(--radius); padding: 12px; background: #fff; }
+        .item { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; align-items: center; border: 1px solid var(--line); border-radius: var(--radius); padding: 12px; background: #fff; }
         .badge { display: inline-flex; align-items: center; min-height: 28px; padding: 0 9px; border-radius: 999px; font-size: .78rem; font-weight: 900; }
         .badge.green { background: #dff7ea; color: #0f7045; }
         .badge.red { background: #ffe4e8; color: #a61e31; }
@@ -1260,3 +1260,12 @@ canvas {
 
 .dropdown-item:hover { background: var(--surface-2); }
 .dropdown-item.logout { color: var(--red); }
+
+@media (max-width: 480px) {
+    #page-configuracoes {
+        width: 100%;
+        max-width: 100%;
+        box-sizing: border-box;
+        overflow-x: hidden;
+    }
+}

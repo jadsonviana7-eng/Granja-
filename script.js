@@ -2133,14 +2133,14 @@ function renderUsers() {
         
         return `
             <div class="item">
-                <div style="display: flex; align-items: center; gap: 12px;">
-                    <img src="${u.avatar_url || 'https://via.placeholder.com/40'}" class="user-avatar-small" style="width: 32px; height: 32px; border-width: 1px;">
-                    <div style="display: flex; flex-direction: column;">
-                        <b style="font-size: 0.9rem;">${esc(u.full_name)} ${isMe ? '(Você)' : ''}</b>
-                        <small style="color: var(--muted); font-size: 0.75rem;">${esc(u.email)}</small>
+                <div style="display: flex; align-items: center; gap: 12px; min-width: 0; flex: 1;">
+                    <img src="${u.avatar_url || 'https://via.placeholder.com/40'}" class="user-avatar-small" style="width: 32px; height: 32px; border-width: 1px; flex-shrink: 0;">
+                    <div style="display: flex; flex-direction: column; min-width: 0; overflow: hidden; flex: 1;">
+                        <b style="font-size: 0.9rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${esc(u.full_name)} ${isMe ? '(Você)' : ''}</b>
+                        <small style="color: var(--muted); font-size: 0.75rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${esc(u.email)}">${esc(u.email)}</small>
                     </div>
                 </div>
-                <div style="display: flex; align-items: center; gap: 8px;">
+                <div style="display: flex; align-items: center; gap: 8px; flex-shrink: 0;">
                     <span class="badge ${roleClass}" style="font-size: 0.65rem; min-height: 22px; padding: 0 8px;">${roleLabel}</span>
                     <button class="icon-btn blue" onclick="openUserEditModal('${u.id}')" title="Editar usuário">
                         ${iconSvg('editar')}
@@ -2172,6 +2172,17 @@ function toggleUserDropdown(event) {
 window.addEventListener('click', () => {
     document.getElementById('user-dropdown')?.classList.remove('show');
 });
+
+function openUserCreateModal() {
+    document.getElementById('profile-edit-form').reset();
+    tempAvatarBase64 = null;
+    document.getElementById('profile-edit-preview').src = DEFAULT_AVATAR;
+    document.getElementById('userCreateModal').style.display = 'flex';
+}
+
+function closeUserCreateModal() {
+    document.getElementById('userCreateModal').style.display = 'none';
+}
 
 async function handleCreateUser(e) {
     e.preventDefault();
@@ -2215,6 +2226,8 @@ async function handleCreateUser(e) {
     e.target.reset();
     tempAvatarBase64 = null;
     document.getElementById('profile-edit-preview').src = DEFAULT_AVATAR;
+    
+    closeUserCreateModal();
     
     // Atualiza a lista de usuários imediatamente
     loadFromSupabase();

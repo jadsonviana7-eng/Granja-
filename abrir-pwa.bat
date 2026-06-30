@@ -13,6 +13,12 @@ if errorlevel 1 (
   )
 )
 
+if not exist "server.cjs" (
+  echo Erro: Arquivo server.cjs nao encontrado no diretorio atual.
+  pause
+  exit /b 1
+)
+
 start "Granja PWA" cmd /k "%NODE_EXE%" server.cjs
-ping 127.0.0.1 -n 3 >nul
-start "" "http://localhost:8765"
+timeout /t 5 /nobreak >nul
+start "" "http://localhost:8765/?v=%RANDOM%"
