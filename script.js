@@ -6,10 +6,16 @@ let supabaseClient = null; // Renomeado para evitar conflito com a global da bib
 const STORE_KEY = "granjaViana_supabase_cache";
 const today = new Date().toISOString().slice(0, 10);
 
-// ─── Estado do período financeiro ───────────────────────────────────────────
+// ─── Estado do período financeiro (Dashboard e Extrato) ─────────────────────────
 // Formato interno: "YYYY-MM-DD"  |  Formato exibição: "DD/MM/YYYY"
-let periodoInicio = `${today.slice(0, 8)}01`; // Dia 1 do mês atual
-let periodoFim    = today;                     // Hoje
+let dataPeriodoDashboard = new Date();
+const NOMES_MESES = [
+    "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
+    "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"
+];
+const _padZero = (n) => String(n).padStart(2, '0');
+let periodoInicio = `${dataPeriodoDashboard.getFullYear()}-${_padZero(dataPeriodoDashboard.getMonth() + 1)}-01`;
+let periodoFim    = `${dataPeriodoDashboard.getFullYear()}-${_padZero(dataPeriodoDashboard.getMonth() + 1)}-${_padZero(new Date(dataPeriodoDashboard.getFullYear(), dataPeriodoDashboard.getMonth() + 1, 0).getDate())}`;
 let extratoInicio = `${today.slice(0, 8)}01`;
 let extratoFim    = today;
 
@@ -392,9 +398,10 @@ function renderDashboard() {
     // Destruir gráficos antigos para evitar sobreposição
     Object.values(activeCharts).forEach(chart => chart.destroy());
 
-    // 1. Dados Produção (Linha: Dia 1 ao dia atual do mês)
-    const startOfMonth = moment().startOf('month');
-    const endOfRange = moment(); 
+    // 1. Dados Produção (Linha: Dia 1 ao último dia do período ou hoje se for o mês corrente)
+    const startOfMonth = moment(periodoInicio);
+    const isCurrentMonth = moment().isSame(startOfMonth, 'month') && moment().isSame(startOfMonth, 'year');
+    const endOfRange = isCurrentMonth ? moment() : moment(periodoFim);
     const diasDoMesAtual = [];
     let currentDay = startOfMonth.clone();
     while (currentDay.isSameOrBefore(endOfRange, 'day')) {
@@ -430,9 +437,11 @@ function renderDashboard() {
         }
     });
 
-    // 2. Vendas por Cliente/Cidade (Filtro Mês Atual)
-    const mesAtualIncio = moment().startOf('month').format('YYYY-MM-DD');
-    const vendasMes = db.historico.filter(h => h.tipo === 'VENDA' && dateToISO(h.data) >= mesAtualIncio);
+    // 2. Vendas por Cliente/Cidade (Filtro Período Selecionado)
+    const vendasMes = db.historico.filter(h => {
+        const d = dateToISO(h.data);
+        return h.tipo === 'VENDA' && d >= periodoInicio && d <= periodoFim;
+    });
     
     const groupData = (key) => {
         const map = {};
@@ -2596,12 +2605,32 @@ function configureRangePicker(selector, startVal, endVal, onUpdate) {
     $el.find('span').html(moment(startVal).format('DD/MM/YYYY') + ' - ' + moment(endVal).format('DD/MM/YYYY'));
 }
 
+function atualizarPeriodoDashboard() {
+    const ano = dataPeriodoDashboard.getFullYear();
+    const mes = dataPeriodoDashboard.getMonth(); // 0-11
+    
+    const ultimoDia = new Date(ano, mes + 1, 0).getDate();
+    const pad = (n) => String(n).padStart(2, '0');
+    
+    periodoInicio = `${ano}-${pad(mes + 1)}-01`;
+    periodoFim = `${ano}-${pad(mes + 1)}-${pad(ultimoDia)}`;
+
+    const labelEl = document.getElementById("periodoDashboardLabel");
+    if (labelEl) {
+        labelEl.textContent = `${NOMES_MESES[mes]} ${ano}`;
+    }
+
+    renderFinance();
+    renderDashboard();
+}
+
+function mudarPeriodoDashboard(delta) {
+    dataPeriodoDashboard.setMonth(dataPeriodoDashboard.getMonth() + delta);
+    atualizarPeriodoDashboard();
+}
+
 function setupPeriodoPicker() {
-    configureRangePicker('#reportrange-financeiro', periodoInicio, periodoFim, (start, end) => {
-        periodoInicio = start;
-        periodoFim = end;
-        renderFinance();
-    });
+    atualizarPeriodoDashboard();
 }
 
 function setupExtratoPicker() {
