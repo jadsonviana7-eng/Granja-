@@ -1,0 +1,66 @@
+id,data_transacao,tipo,Cliente,Produto,Qtd,Valorunitario,Desconto,Valor,Descricao,Status,Datapagamento,Datapagamento
+1778696029498,2026-04-10 00:00:00,SAIDA,,,100,"R$ 0,30",,"R$ 30,00",Compra de Bendeja 30 G,pago,,
+1778696797403,2026-04-10 00:00:00,SAIDA,,,3,"R$ 25,00",,"R$ 75,00",Palha de arroz saco 30kg,pago,,
+1778696902795,2026-04-10 00:00:00,SAIDA,,,3,"R$ 76,00",,"R$ 228,00",Ração Crescimento Saco 40kg,pago,,
+1778696954660,2026-04-10 00:00:00,SAIDA,,,12,"R$ 76,00",,"R$ 912,00",Ração Postura saco 40kg,pago,,
+1778697025420,2026-04-20 00:00:00,VENDA,Rubian,Badeja 30 G,11,"R$ 18,00","R$ 0,00","R$ 198,00",Pagto. via pix,pago,,
+1778697075515,2026-04-21 00:00:00,VENDA,Janderson,Bandeja 30 GS,1,"R$ 18,00","R$ 0,00","R$ 18,00",Em dinheiro,pago,,
+1778695069552,2026-04-27 00:00:00,SAIDA,,,1,"R$ 50,00",,"R$ 50,00",Despesa de Combustível ,pago,,
+1778695146177,2026-04-27 00:00:00,SAIDA,,,1,"R$ 110,00",,"R$ 110,00",Ração Crescimento saco 40kg,pago,,
+1778695240833,2026-04-27 00:00:00,VENDA,Tonha (Ximende),Badeja 30 G,1,"R$ 20,00","R$ 0,00","R$ 20,00",Aguardando pagto...,pendente,,
+1778695294025,2026-04-27 00:00:00,VENDA,Bidil,Bandeja 30 GS,3,"R$ 18,00","R$ 0,00","R$ 54,00",Via pix,pago,,
+1778695497633,2026-04-27 00:00:00,VENDA,Renaide (Mundaú),Bandeja 30 GS,2,"R$ 18,00","R$ 0,00","R$ 36,00",Em dinheiro,pago,,
+1778695635961,2026-04-27 00:00:00,VENDA,Joseano (Ninho),Badeja 30 G,6,"R$ 18,00","R$ 0,00","R$ 108,00",Pagto via pix,pago,2026-05-04,2026-05-04
+1778695747865,2026-04-27 00:00:00,VENDA,Simone (do depósito),Badeja 30 G,2,"R$ 20,00","R$ 0,00","R$ 40,00",Em dinheiro,pago,,
+1778695794514,2026-04-27 00:00:00,VENDA,Nataniel / Taísa,Badeja 30 G,3,"R$ 20,00","R$ 0,00","R$ 60,00",Em dinheiro,pago,,
+1778695832681,2026-04-27 00:00:00,VENDA,Super Mercado Econômico,Bandeja 12 G,24,"R$ 9,00","R$ 0,00","R$ 216,00",Pagto via pix,pago,,
+1778695886266,2026-04-27 00:00:00,VENDA,Padaria Maria Clara,Badeja 30 G,9,"R$ 16,00","R$ 0,00","R$ 144,00",Em dinheiro,pago,,
+1778694975296,2026-04-28 00:00:00,VENDA,Madalena,Bandeja 30 GS,1,"R$ 18,00","R$ 0,00","R$ 18,00",Via pix,pago,,
+1778694408143,2026-05-01 00:00:00,VENDA,Sandro (Ximende),Badeja 30 G,1,"R$ 20,00","R$ 0,00","R$ 20,00",Em dinheiro,pago,,
+1778694284375,2026-05-03 00:00:00,VENDA,Bidil,Bandeja 30 GS,2,"R$ 18,00","R$ 0,00","R$ 36,00",Pagto via pix,pago,,
+1778694109255,2026-05-04 00:00:00,VENDA,Isabel (Diretora),Bandeja 30 GS,1,"R$ 18,00","R$ 0,00","R$ 18,00",Merendeira do Pequeno Príncipe,pago,,
+1778694149023,2026-05-04 00:00:00,VENDA,Isabel (Diretora),Bandeja 30 GS,1,"R$ 18,00","R$ 0,00","R$ 18,00",Aguardando pagto...,pendente,,
+1778694210391,2026-05-04 00:00:00,VENDA,Renaide (Mundaú),Bandeja 30 GS,1,"R$ 18,00","R$ 0,00","R$ 18,00",Pago em dinheiro ,pago,2026-05-29,2026-05-29
+1778794578489,2026-05-04 00:00:00,VENDA,Joseano (Ninho),Badeja 30 G,7,,"R$ 0,00","R$ 126,00",Em dinheiro,pago,2026-05-13,2026-05-13
+1778693855182,2026-05-05 00:00:00,VENDA,Janderson,Bandeja 30 GS,1,"R$ 18,00","R$ 0,00","R$ 18,00",Via Pix,pago,,
+1778686859788,2026-05-06 00:00:00,SAIDA,,,480,"R$ 1,90",,"R$ 912,00",Daniel Rações ,pago,,
+1778686893396,2026-05-06 00:00:00,SAIDA,,,240,"R$ 2,08",,"R$ 499,20",Daniel Rações ,pago,,
+1778686924404,2026-05-06 00:00:00,SAIDA,,,40,"R$ 0,32",,"R$ 12,80",Compra de Sacola plástica,pago,,
+1778693999463,2026-05-07 00:00:00,VENDA,Bidil,Bandeja 30 GS,1,"R$ 18,00","R$ 0,00","R$ 18,00",Em dinheiro,pago,,
+1778692791733,2026-05-09 00:00:00,VENDA,Rubian,Badeja 30 G,12,"R$ 18,00","R$ 0,00","R$ 216,00",Pago em 14/05,pago,,
+1778692952189,2026-05-09 00:00:00,VENDA,Nataniel / Taísa,Badeja 30 G,3,"R$ 20,00","R$ 0,00","R$ 60,00",Em dinheiro,pago,,
+1778692990797,2026-05-09 00:00:00,VENDA,Super Mercado Econômico,Bandeja 12 G,25,"R$ 9,00","R$ 0,00","R$ 225,00",Pago via Pix - 14/05/2026,pago,2026-05-14,2026-05-14
+1778693048933,2026-05-09 00:00:00,VENDA,Padaria Maria Clara,Badeja 30 G,10,"R$ 16,00","R$ 0,00","R$ 160,00",Em dinheiro,pago,,
+1778693114982,2026-05-10 00:00:00,VENDA,Cido (Ximende),Badeja 30 G,1,"R$ 20,00","R$ 0,00","R$ 20,00",Em dinheiro,pago,,
+1778692316964,2026-05-11 00:00:00,VENDA,Madalena,Bandeja 30 GS,1,"R$ 18,00","R$ 0,00","R$ 18,00",Via pix,pago,,
+1778686727092,2026-05-12 00:00:00,VENDA,Bidil,Bandeja 30 GS,2,"R$ 18,00","R$ 0,00","R$ 36,00",Em dinheiro,pago,,
+1778794615926,2026-05-13 00:00:00,VENDA,Joseano (Ninho),Badeja 30 G,7,,"R$ 0,00","R$ 126,00",Pago em 24/05/2026,pago,2026-05-24,2026-05-24
+1778807362408,2026-05-14 00:00:00,VENDA,Renaide (Mundaú),Bandeja 30 GS,1,,"R$ 0,00","R$ 18,00",Aguardando pagto...,pendente,,
+1779063350668,2026-05-17 00:00:00,VENDA,Janderson,Bandeja 30 GS,1,,"R$ 0,00","R$ 18,00",Em dinheiro ,pago,,
+1779303314786,2026-05-20 00:00:00,VENDA,Simone (do depósito),Badeja 30 G,2,,"R$ 0,00","R$ 40,00",Em dinheiro,pago,,
+1779303357141,2026-05-20 00:00:00,VENDA,Padaria Maria Clara,Badeja 30 G,10,,"R$ 0,00","R$ 160,00",Em dinheiro,pago,,
+1779303429250,2026-05-20 00:00:00,VENDA,Mercado do Júnior,Badeja 30 G,10,,"R$ 0,00","R$ 160,00","Pagou 110,00, devendo 50,00",pendente,,
+1779532872329,2026-05-21 00:00:00,VENDA,Dayane,Badeja 30 G,2,,"R$ 0,00","R$ 36,00",Pago via pix,pago,2026-06-04,2026-06-04
+1779707833065,2026-05-24 00:00:00,VENDA,Joseano (Ninho),Badeja 30 G,7,,"R$ 0,00","R$ 126,00",Aguardando pagto...,pendente,,
+1779707883026,2026-05-24 00:00:00,VENDA,Tonha (Ximende),Badeja 30 G,1,,"R$ 0,00","R$ 18,00",Aguardando pagto...,pendente,,
+1779708720137,2026-05-24 00:00:00,VENDA,Cliente não cadastrado,Badeja 30 G,1,,"R$ 0,00","R$ 18,00",Sogra do Ronilson,pago,,
+1779709236546,2026-05-24 00:00:00,VENDA,Bidil,Badeja 30 G,3,,"R$ 0,00","R$ 54,00",,pago,2026-05-25,2026-05-25
+1779804359310,2026-05-05 00:00:00,SAIDA,,,1,,,"R$ 63,82",Rolo plástico filme 1000m,pago,2026-05-26,2026-05-26
+1779918894026,2026-05-27 00:00:00,VENDA,Super Mercado Econômico,Bandeja 12 G,50,,"R$ 0,00","R$ 450,00",Pago via Pix em 02/06/2026,pago,2026-06-04,2026-06-04
+1780003455671,2026-05-23 00:00:00,VENDA,Madalena,Bandeja 30 GS,1,,"R$ 0,00","R$ 18,00",Pago via pix,pago,2026-05-28,2026-05-28
+1780167299145,2026-05-27 00:00:00,VENDA,Nataniel / Taísa,Bandeja 30 G,3,,"R$ 0,00","R$ 54,00",Pago em dinheiro,pago,2026-05-27,2026-05-27
+1780225984148,2026-05-30 00:00:00,VENDA,Janderson,Bandeja 30 GS,1,,"R$ 0,00","R$ 18,00",Pago via pix,pago,2026-05-30,2026-05-30
+1780226188214,2026-05-28 00:00:00,VENDA,Renaide (Mundaú),Bandeja 30 GS,1,,"R$ 0,00","R$ 18,00",Pessoal do Pequeno Príncipe ,pago,2026-06-08,2026-06-08
+1780589764220,2026-06-03 00:00:00,VENDA,Cida do Dinho,Bandeja 30 G,2,,"R$ 0,00","R$ 40,00",Aguardando pagto...,pendente,,
+1780885457953,2026-06-05 00:00:00,VENDA,Padaria Maria Clara,Bandeja 30 G,10,,"R$ 0,00","R$ 160,00",Em dinheiro ,pago,2026-06-08,2026-06-08
+1780885531328,2026-06-05 00:00:00,VENDA,Super Mercado Econômico,Bandeja 12 G,24,,"R$ 0,00","R$ 216,00",Aguardando pagto...,pendente,,
+1780885613779,2026-06-05 00:00:00,VENDA,Rubian,Bandeja 30 G,11,,"R$ 0,00","R$ 198,00",Aguardando...,pendente,,
+1780885771709,2026-06-06 00:00:00,VENDA,Madalena,Bandeja 30 GS,1,,"R$ 0,00","R$ 18,00",Aguardando pagto...,pendente,,
+1780886298884,2026-06-02 00:00:00,SAIDA,,,"6,81",,,"R$ 50,05",Combustível ⛽ desp. de viagem p/ Lajedo,pago,2026-06-08,2026-06-08
+1780886476355,2026-06-02 00:00:00,SAIDA,,,"29,9",,,"R$ 200,03",Combustível ⛽ desp. de viagem Lajedo,pago,2026-06-08,2026-06-08
+1780886701831,2026-06-02 00:00:00,SAIDA,,,480,,,"R$ 912,00",Daniel Rações 12 sacos postura 40kg,pago,2026-06-08,2026-06-08
+1780886906773,2026-06-02 00:00:00,SAIDA,,,321,,,"R$ 632,37",Daniel Rações 8 sacos crescimento 40kg,pago,2026-06-08,2026-06-08
+1780887013561,2026-06-02 00:00:00,SAIDA,,,4,,,"R$ 100,00",Sacos palha de arroz 25kg,pago,2026-06-08,2026-06-08
+1780887069849,2026-06-02 00:00:00,SAIDA,,,3,,,"R$ 30,00",Lona preta 8m,pago,2026-06-08,2026-06-08
+1780938117274,2026-06-08 00:00:00,VENDA,Dayane,Bandeja 30 G,1,,"R$ 0,00","R$ 18,00",Aguardando pagto...,pendente,,
+1780938156717,2026-06-08 00:00:00,VENDA,Bidil,Bandeja 30 GS,2,,"R$ 0,00","R$ 36,00",Aguardando pagto...,pendente,,

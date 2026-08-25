@@ -1,0 +1,4 @@
+Id,Nome,Preco,Tipoovo,Ovosporitem,Composicao,Tipoovo
+1778686454380,Bandeja 30 G,"R$ 18,00",Grande,30,"[{""insumoId"":""1778685740773"",""qtdNecessaria"":1}]",Grande
+1778686526051,Bandeja 12 G,"R$ 9,00",Grande,12,"[{""insumoId"":""1778685932498"",""qtdNecessaria"":1}]",Grande
+1778686641972,Bandeja 30 GS,"R$ 18,00",Grande,30,"[{""insumoId"":""1778685740773"",""qtdNecessaria"":1},{""insumoId"":""1778686364075"",""qtdNecessaria"":1}]",Grande
