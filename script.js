@@ -1221,18 +1221,37 @@ async function handleProduction(e) {
     const loss = parseInt(document.getElementById("prodLoss").value, 10) || 0;
     const liquido = coll - loss;
 
+    let insertedId = Date.now();
     if (supabaseClient) {
-        const { error } = await supabaseClient.from('producao_diaria').insert({
+        const { data: resData, error } = await supabaseClient.from('producao_diaria').insert({
             data_coleta: data,
+            tipo_ovo: type,
             quantidade_ovos_bons: liquido,
             quantidade_ovos_quebrados: loss
-        });
-        if (error) return toast("Erro no banco: " + error.message);
+        }).select();
+
+        if (error) {
+            console.error("Erro ao salvar coleta no banco:", error);
+            if (error.message && (error.message.includes("tipo_ovo") || error.code === "PGRST204" || error.code === "42703")) {
+                const { data: retryData, error: retryError } = await supabaseClient.from('producao_diaria').insert({
+                    data_coleta: data,
+                    quantidade_ovos_bons: liquido,
+                    quantidade_ovos_quebrados: loss,
+                    observacoes: `Tipo: ${type}`
+                }).select();
+                if (retryError) return toast("Erro no banco: " + retryError.message);
+                if (retryData && retryData[0]) insertedId = retryData[0].id;
+            } else {
+                return toast("Erro no banco: " + error.message);
+            }
+        } else if (resData && resData[0]) {
+            insertedId = resData[0].id;
+        }
     }
 
     db.estoque[type] = (Number(db.estoque[type]) || 0) + liquido;
     db.coletas.push({
-        id: Date.now(),
+        id: insertedId,
         data: data,
         tipo: type,
         bruto: coll,
@@ -2440,14 +2459,21 @@ async function loadFromSupabase() {
 
         // Coletas de produção
         if (!resColetas.error && resColetas.data) {
-            db.coletas = resColetas.data.map(c => normalizeColeta({
-                id:      c.id,
-                data:    c.data_coleta,
-                tipo:    c.tipo_ovo || 'Grande',
-                bruto:   (c.quantidade_ovos_bons || 0) + (c.quantidade_ovos_quebrados || 0),
-                perda:   c.quantidade_ovos_quebrados || 0,
-                liquido: c.quantidade_ovos_bons || 0
-            }));
+            db.coletas = resColetas.data.map(c => {
+                let tipo = c.tipo_ovo;
+                if (!tipo && c.observacoes && c.observacoes.includes("Tipo:")) {
+                    const match = c.observacoes.match(/Tipo:\s*([A-Za-zÀ-ÿ]+)/);
+                    if (match) tipo = match[1];
+                }
+                return normalizeColeta({
+                    id:      c.id,
+                    data:    c.data_coleta,
+                    tipo:    tipo || 'Grande',
+                    bruto:   (c.quantidade_ovos_bons || 0) + (c.quantidade_ovos_quebrados || 0),
+                    perda:   c.quantidade_ovos_quebrados || 0,
+                    liquido: c.quantidade_ovos_bons || 0
+                });
+            });
         }
 
         // --- RECONSTRUÇÃO DO ESTOQUE DE OVOS ---
@@ -2752,6 +2778,7 @@ async function dbSalvarColeta(novaColeta) {
     try {
         const { error } = await supabaseClient.from('producao_diaria').upsert({
             data_coleta: novaColeta.data,
+            tipo_ovo: novaColeta.tipo || 'Grande',
             quantidade_ovos_bons: novaColeta.bons,
             quantidade_ovos_quebrados: novaColeta.quebrados,
             observacoes: novaColeta.obs

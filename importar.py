@@ -111,6 +111,7 @@ def importar_producao():
         dados.append({
             "id": int(row["Id"]),
             "data_coleta": data_formatada,
+            "tipo_ovo": str(row["Tipo"]) if pd.notna(row.get("Tipo")) else "Grande",
             "quantidade_ovos_bons": int(row["Liquido"]),
             "quantidade_ovos_quebrados": int(row["Perda"]),
             "observacoes": f"Tipo: {row['Tipo']} | Bruto: {row['Bruto']}"
