@@ -6,9 +6,10 @@ let supabaseClient = null; // Renomeado para evitar conflito com a global da bib
 const STORE_KEY = "granjaViana_supabase_cache";
 const today = new Date().toISOString().slice(0, 10);
 
-// ─── Estado do período financeiro (Dashboard e Extrato) ─────────────────────────
+// ─── Estado do período financeiro (Dashboard e Extrato) e Produção ──────────────
 // Formato interno: "YYYY-MM-DD"  |  Formato exibição: "DD/MM/YYYY"
 let dataPeriodoDashboard = new Date();
+let dataPeriodoColeta = new Date();
 const NOMES_MESES = [
     "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
     "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"
@@ -326,7 +327,9 @@ function decorateCardHeaders() {
         ["Editar Lançamento", "editar"],
         ["Editar Cliente", "cliente"],
         ["Editar Usuário", "usuarios"],
-        ["Editar Insumo", "insumo"]
+        ["Editar Insumo", "insumo"],
+        ["Editar Coleta", "producao"],
+        ["Nova Coleta", "producao"]
     ];
 
     document.querySelectorAll(".card-header h2").forEach((title) => {
@@ -754,20 +757,14 @@ function renderExtract() {
 
 function renderColetas() {
     const lista = document.getElementById("coletaList");
-    const filtroData = document.getElementById("filtroDataColeta");
     if (!lista) return;
 
-    let mesFiltro, anoFiltro;
+    const anoFiltro = dataPeriodoColeta.getFullYear();
+    const mesFiltro = dataPeriodoColeta.getMonth(); // 0-11
 
-    if (filtroData && filtroData.value) {
-        const partes = filtroData.value.split("-");
-        anoFiltro = parseInt(partes[0]);
-        mesFiltro = parseInt(partes[1]) - 1;
-    } else {
-        const agora = new Date();
-        mesFiltro = agora.getMonth();
-        anoFiltro = agora.getFullYear();
-        if (filtroData) filtroData.value = `${anoFiltro}-${String(mesFiltro + 1).padStart(2, '0')}`;
+    const labelEl = document.getElementById("periodoColetaLabel");
+    if (labelEl) {
+        labelEl.textContent = `${NOMES_MESES[mesFiltro]} ${anoFiltro}`;
     }
 
     const coletasFiltradas = db.coletas
@@ -781,7 +778,7 @@ function renderColetas() {
 
     const totalProduzido = coletasFiltradas.reduce((acc, item) => acc + (item.liquido || 0), 0);
     const totalEl = document.getElementById("totalColetasMes");
-    if (totalEl) totalEl.textContent = `${totalProduzido.toLocaleString()} ovos`;
+    if (totalEl) totalEl.textContent = `${totalProduzido.toLocaleString('pt-BR')} ovos`;
 
     let html = "";
     if (coletasFiltradas.length === 0) {
@@ -790,7 +787,7 @@ function renderColetas() {
         coletasFiltradas.forEach(item => {
             html += `
                 <div class="item">
-                    <div style="display: flex; flex-direction: column; align-items: flex-start;">
+                    <div style="display: flex; flex-direction: column; align-items: flex-start; cursor: pointer; flex: 1;" onclick="openColetaEditModal(${item.id})">
                         <span style="font-size: 0.75rem; color: var(--muted); font-weight: bold; text-transform: uppercase;">
                             ${formatarDataBR(item.data)}
                         </span>
@@ -802,13 +799,23 @@ function renderColetas() {
                         </small>
                     </div>
                     
-                    <button class="icon-btn danger" type="button" onclick="deleteItem('coletas', ${item.id})" title="Excluir coleta">
-                        ${deleteIcon()}
-                    </button>
+                    <div style="display: flex; gap: 8px;">
+                        <button class="icon-btn blue" type="button" onclick="openColetaEditModal(${item.id})" title="Editar coleta">
+                            ${iconSvg('editar')}
+                        </button>
+                        <button class="icon-btn danger" type="button" onclick="deleteItem('coletas', ${item.id})" title="Excluir coleta">
+                            ${deleteIcon()}
+                        </button>
+                    </div>
                 </div>`;
         });
     }
     lista.innerHTML = html;
+}
+
+function mudarPeriodoColeta(delta) {
+    dataPeriodoColeta.setMonth(dataPeriodoColeta.getMonth() + delta);
+    renderColetas();
 }
 
 function renderPlantel() {
@@ -980,6 +987,164 @@ function openInsumoEditModal(id) {
 function closeInsumoEditModal() {
     document.getElementById("insumoEditModal").style.display = "none";
     currentEditingInsumoId = null;
+}
+
+function openProductionModal() {
+    const modal = document.getElementById("productionModal");
+    const dateInput = document.getElementById("modalProdDate");
+    if (dateInput) dateInput.value = today;
+    const lossInput = document.getElementById("modalProdLoss");
+    if (lossInput) lossInput.value = "0";
+    const collInput = document.getElementById("modalProdCollected");
+    if (collInput) collInput.value = "";
+    if (modal) modal.style.display = "flex";
+}
+
+function closeProductionModal() {
+    const modal = document.getElementById("productionModal");
+    if (modal) modal.style.display = "none";
+}
+
+async function handleModalProduction(e) {
+    e.preventDefault();
+    const type = document.getElementById("modalProdType").value;
+    const data = document.getElementById("modalProdDate").value || today;
+    const coll = parseInt(document.getElementById("modalProdCollected").value, 10) || 0;
+    const loss = parseInt(document.getElementById("modalProdLoss").value, 10) || 0;
+    const liquido = coll - loss;
+
+    let insertedId = Date.now();
+    if (supabaseClient) {
+        const { data: resData, error } = await supabaseClient.from('producao_diaria').insert({
+            data_coleta: data,
+            tipo_ovo: type,
+            quantidade_ovos_bons: liquido,
+            quantidade_ovos_quebrados: loss
+        }).select();
+
+        if (error) {
+            console.error("Erro ao salvar coleta no banco:", error);
+            if (error.message && (error.message.includes("tipo_ovo") || error.code === "PGRST204" || error.code === "42703")) {
+                const { data: retryData, error: retryError } = await supabaseClient.from('producao_diaria').insert({
+                    data_coleta: data,
+                    quantidade_ovos_bons: liquido,
+                    quantidade_ovos_quebrados: loss,
+                    observacoes: `Tipo: ${type}`
+                }).select();
+                if (retryError) return toast("Erro no banco: " + retryError.message);
+                if (retryData && retryData[0]) insertedId = retryData[0].id;
+            } else {
+                return toast("Erro no banco: " + error.message);
+            }
+        } else if (resData && resData[0]) {
+            insertedId = resData[0].id;
+        }
+    }
+
+    db.estoque[type] = (Number(db.estoque[type]) || 0) + liquido;
+    db.coletas.push({
+        id: insertedId,
+        data: data,
+        tipo: type,
+        bruto: coll,
+        perda: loss,
+        liquido
+    });
+
+    save();
+    e.target.reset();
+    setDefaultDates();
+    closeProductionModal();
+    toast("Coleta salva com sucesso!");
+}
+
+let currentEditingColetaId = null;
+
+function openColetaEditModal(id) {
+    const coleta = db.coletas.find(c => c.id === id);
+    if (!coleta) return;
+
+    currentEditingColetaId = id;
+    document.getElementById("editColetaId").value = coleta.id;
+    document.getElementById("editColetaDate").value = dateToISO(coleta.data);
+    document.getElementById("editColetaType").value = coleta.tipo || "Grande";
+    document.getElementById("editColetaCollected").value = coleta.bruto || 0;
+    document.getElementById("editColetaLoss").value = coleta.perda || 0;
+    document.getElementById("editColetaLiquid").value = coleta.liquido || 0;
+    
+    document.getElementById("coletaEditModal").style.display = "flex";
+}
+
+function closeColetaEditModal() {
+    document.getElementById("coletaEditModal").style.display = "none";
+    currentEditingColetaId = null;
+}
+
+function calcEditColetaLiquid() {
+    const coll = parseInt(document.getElementById("editColetaCollected").value, 10) || 0;
+    const loss = parseInt(document.getElementById("editColetaLoss").value, 10) || 0;
+    const liquido = Math.max(0, coll - loss);
+    document.getElementById("editColetaLiquid").value = liquido;
+}
+
+async function handleColetaEdit(e) {
+    e.preventDefault();
+    const id = parseFloat(document.getElementById("editColetaId").value);
+    const coleta = db.coletas.find(c => c.id === id);
+    if (!coleta) return;
+
+    const data = document.getElementById("editColetaDate").value || today;
+    const type = document.getElementById("editColetaType").value || "Grande";
+    const coll = parseInt(document.getElementById("editColetaCollected").value, 10) || 0;
+    const loss = parseInt(document.getElementById("editColetaLoss").value, 10) || 0;
+    const liquido = Math.max(0, coll - loss);
+
+    const oldType = coleta.tipo || "Grande";
+    const oldLiquido = Number(coleta.liquido) || 0;
+
+    // Atualiza no banco de dados se conectado ao Supabase
+    if (supabaseClient) {
+        const { error } = await supabaseClient.from('producao_diaria').update({
+            data_coleta: data,
+            tipo_ovo: type,
+            quantidade_ovos_bons: liquido,
+            quantidade_ovos_quebrados: loss
+        }).eq('id', id);
+
+        if (error) {
+            console.error("Erro ao atualizar coleta no Supabase:", error);
+            if (error.message && (error.message.includes("tipo_ovo") || error.code === "PGRST204" || error.code === "42703")) {
+                await supabaseClient.from('producao_diaria').update({
+                    data_coleta: data,
+                    quantidade_ovos_bons: liquido,
+                    quantidade_ovos_quebrados: loss,
+                    observacoes: `Tipo: ${type}`
+                }).eq('id', id);
+            }
+        }
+    }
+
+    // Ajuste de Estoque
+    if (oldType === type) {
+        const diff = liquido - oldLiquido;
+        db.estoque[type] = (Number(db.estoque[type]) || 0) + diff;
+    } else {
+        db.estoque[oldType] = (Number(db.estoque[oldType]) || 0) - oldLiquido;
+        db.estoque[type] = (Number(db.estoque[type]) || 0) + liquido;
+        if (db.estoque[oldType] < 0) db.estoque[oldType] = 0;
+    }
+    if (db.estoque[type] < 0) db.estoque[type] = 0;
+
+    // Atualiza no array local
+    coleta.data = data;
+    coleta.tipo = type;
+    coleta.bruto = coll;
+    coleta.perda = loss;
+    coleta.liquido = liquido;
+
+    save();
+    closeColetaEditModal();
+    toast("Coleta atualizada e estoque recalculado!");
 }
 
 function closeCompositionModal() {
@@ -1965,6 +2130,302 @@ function printReport() {
     win.onload = () => win.print();
 }
 
+function showProductionReport() {
+    const anoFiltro = dataPeriodoColeta.getFullYear();
+    const mesFiltro = dataPeriodoColeta.getMonth(); // 0-11
+    const nomeMes = NOMES_MESES[mesFiltro];
+
+    const coletasMes = db.coletas
+        .filter(c => {
+            const iso = dateToISO(c.data);
+            if (!iso) return false;
+            const [ano, mes] = iso.split("-").map(Number);
+            return ano === anoFiltro && mes === (mesFiltro + 1);
+        })
+        .sort((a, b) => dateToISO(a.data).localeCompare(dateToISO(b.data)));
+
+    const totalBruto = coletasMes.reduce((acc, c) => acc + (c.bruto || 0), 0);
+    const totalPerda = coletasMes.reduce((acc, c) => acc + (c.perda || 0), 0);
+    const totalLiquido = coletasMes.reduce((acc, c) => acc + (c.liquido || 0), 0);
+    const taxaPerda = totalBruto > 0 ? ((totalPerda / totalBruto) * 100).toFixed(1) : "0.0";
+    
+    // Dias com coletas
+    const diasUnicos = new Set(coletasMes.map(c => dateToISO(c.data)));
+    const diasComColeta = diasUnicos.size;
+    const mediaDiaria = diasComColeta > 0 ? (totalLiquido / diasComColeta).toFixed(1) : "0";
+
+    // Atualiza o texto do período
+    const periodLabel = document.getElementById("prodReportPeriodText");
+    if (periodLabel) periodLabel.textContent = `Mês de Referência: ${nomeMes} de ${anoFiltro}`;
+
+    // 1. KPIs
+    const kpisHtml = `
+        <div class="card" style="margin: 0; padding: 12px; background: var(--surface-2); text-align: center; border: 1px solid var(--line);">
+            <small style="color: var(--muted); font-weight: bold; text-transform: uppercase; font-size: 0.7rem;">Total Coletado</small>
+            <b style="font-size: 1.3rem; color: var(--ink); display: block; margin-top: 4px;">${totalBruto.toLocaleString('pt-BR')}</b>
+            <span style="font-size: 0.72rem; color: var(--muted);">ovos brutos</span>
+        </div>
+        <div class="card" style="margin: 0; padding: 12px; background: #ecfdf5; text-align: center; border: 1px solid #a7f3d0;">
+            <small style="color: var(--green); font-weight: bold; text-transform: uppercase; font-size: 0.7rem;">Ovos Líquidos</small>
+            <b style="font-size: 1.3rem; color: var(--green); display: block; margin-top: 4px;">${totalLiquido.toLocaleString('pt-BR')}</b>
+            <span style="font-size: 0.72rem; color: #059669;">aptos para venda</span>
+        </div>
+        <div class="card" style="margin: 0; padding: 12px; background: #fef2f2; text-align: center; border: 1px solid #fecaca;">
+            <small style="color: var(--red); font-weight: bold; text-transform: uppercase; font-size: 0.7rem;">Perdas / Quebras</small>
+            <b style="font-size: 1.3rem; color: var(--red); display: block; margin-top: 4px;">${totalPerda.toLocaleString('pt-BR')}</b>
+            <span style="font-size: 0.72rem; color: var(--red);">${taxaPerda}% de descarte</span>
+        </div>
+        <div class="card" style="margin: 0; padding: 12px; background: #eff6ff; text-align: center; border: 1px solid #bfdbfe;">
+            <small style="color: var(--blue); font-weight: bold; text-transform: uppercase; font-size: 0.7rem;">Média Diária</small>
+            <b style="font-size: 1.3rem; color: var(--blue); display: block; margin-top: 4px;">${mediaDiaria}</b>
+            <span style="font-size: 0.72rem; color: var(--blue);">ovos / dia (${diasComColeta} dias)</span>
+        </div>
+    `;
+    const kpisEl = document.getElementById("prodReportKPIs");
+    if (kpisEl) kpisEl.innerHTML = kpisHtml;
+
+    // 2. Projeção por Embalagens: Bandeja de 30 e Bandeja de 12
+    const prods30 = db.produtos.filter(p => Number(p.ovosPorItem) === 30);
+    const prods12 = db.produtos.filter(p => Number(p.ovosPorItem) === 12);
+
+    const preco30 = prods30.length > 0 ? prods30[0].preco : 0;
+    const preco12 = prods12.length > 0 ? prods12[0].preco : 0;
+    const nomeProd30 = prods30.length > 0 ? prods30[0].nome : "Bandeja 30 Ovos";
+    const nomeProd12 = prods12.length > 0 ? prods12[0].nome : "Bandeja 12 Ovos";
+
+    const qtd30Decimal = (totalLiquido / 30);
+    const qtd30Int = Math.floor(totalLiquido / 30);
+    const sobra30 = totalLiquido % 30;
+    const valorTotal30 = qtd30Decimal * preco30;
+
+    const qtd12Decimal = (totalLiquido / 12);
+    const qtd12Int = Math.floor(totalLiquido / 12);
+    const sobra12 = totalLiquido % 12;
+    const valorTotal12 = qtd12Decimal * preco12;
+
+    const packagingHtml = `
+        <div style="background: linear-gradient(135deg, #1e3a8a, #2563eb); color: white; padding: 16px; border-radius: 12px; box-shadow: 0 4px 12px rgba(37, 99, 235, 0.2);">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                <div>
+                    <span style="background: rgba(255,255,255,0.2); padding: 2px 8px; border-radius: 20px; font-size: 0.7rem; font-weight: bold; text-transform: uppercase;">Embalagem 30 Ovos</span>
+                    <h4 style="margin: 8px 0 2px; font-size: 1.25rem;">${esc(nomeProd30)}</h4>
+                    <small style="opacity: 0.85; font-size: 0.8rem;">Unitário cadastrado: <b>${money(preco30)}</b></small>
+                </div>
+                <div style="font-size: 1.8rem; opacity: 0.3;"><i class="fas fa-layer-group"></i></div>
+            </div>
+            <div style="margin-top: 14px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,0.2); display: flex; justify-content: space-between; align-items: flex-end;">
+                <div>
+                    <div style="font-size: 0.75rem; opacity: 0.85;">Total de Bandejas:</div>
+                    <b style="font-size: 1.4rem;">${qtd30Int} <span style="font-size: 0.85rem; font-weight: normal;">(+${sobra30} ovos)</span></b>
+                    <div style="font-size: 0.72rem; opacity: 0.8;">(${qtd30Decimal.toFixed(1)} bandejas exatas)</div>
+                </div>
+                <div style="text-align: right;">
+                    <div style="font-size: 0.75rem; opacity: 0.85;">Faturamento Est.:</div>
+                    <b style="font-size: 1.4rem; color: #6ee7b7;">${money(valorTotal30)}</b>
+                </div>
+            </div>
+        </div>
+
+        <div style="background: linear-gradient(135deg, #065f46, #059669); color: white; padding: 16px; border-radius: 12px; box-shadow: 0 4px 12px rgba(5, 150, 105, 0.2);">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                <div>
+                    <span style="background: rgba(255,255,255,0.2); padding: 2px 8px; border-radius: 20px; font-size: 0.7rem; font-weight: bold; text-transform: uppercase;">Embalagem 12 Ovos (Dúzia)</span>
+                    <h4 style="margin: 8px 0 2px; font-size: 1.25rem;">${esc(nomeProd12)}</h4>
+                    <small style="opacity: 0.85; font-size: 0.8rem;">Unitário cadastrado: <b>${money(preco12)}</b></small>
+                </div>
+                <div style="font-size: 1.8rem; opacity: 0.3;"><i class="fas fa-egg"></i></div>
+            </div>
+            <div style="margin-top: 14px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,0.2); display: flex; justify-content: space-between; align-items: flex-end;">
+                <div>
+                    <div style="font-size: 0.75rem; opacity: 0.85;">Total de Estojos/Dúzias:</div>
+                    <b style="font-size: 1.4rem;">${qtd12Int} <span style="font-size: 0.85rem; font-weight: normal;">(+${sobra12} ovos)</span></b>
+                    <div style="font-size: 0.72rem; opacity: 0.8;">(${qtd12Decimal.toFixed(1)} estojos exatos)</div>
+                </div>
+                <div style="text-align: right;">
+                    <div style="font-size: 0.75rem; opacity: 0.85;">Faturamento Est.:</div>
+                    <b style="font-size: 1.4rem; color: #a7f3d0;">${money(valorTotal12)}</b>
+                </div>
+            </div>
+        </div>
+    `;
+    const packEl = document.getElementById("prodReportPackagingCards");
+    if (packEl) packEl.innerHTML = packagingHtml;
+
+    // 3. Tabela com TODOS os produtos cadastrados na aba Dados
+    const prodsTableBody = document.getElementById("prodReportProductsBody");
+    if (prodsTableBody) {
+        if (db.produtos.length === 0) {
+            prodsTableBody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:15px; color:var(--muted);">Nenhum produto cadastrado na aba Dados.</td></tr>';
+        } else {
+            prodsTableBody.innerHTML = db.produtos.map((p, idx) => {
+                const ovosItem = Number(p.ovosPorItem) || 0;
+                const qtdEquiv = ovosItem > 0 ? (totalLiquido / ovosItem) : 0;
+                const qtdInt = ovosItem > 0 ? Math.floor(totalLiquido / ovosItem) : 0;
+                const sobra = ovosItem > 0 ? (totalLiquido % ovosItem) : 0;
+                const valorEst = qtdEquiv * (Number(p.preco) || 0);
+                const rowBg = idx % 2 === 1 ? "#f9fafb" : "#ffffff";
+
+                return `
+                    <tr style="background: ${rowBg};">
+                        <td style="padding: 10px; border: 1px solid var(--line); font-weight: 600;">${esc(p.nome)}</td>
+                        <td style="padding: 10px; border: 1px solid var(--line); text-align: center;"><span class="badge blue" style="font-size:0.7rem;">${esc(p.tipoOvo || "Geral")}</span></td>
+                        <td style="padding: 10px; border: 1px solid var(--line); text-align: center;">${ovosItem} ovos</td>
+                        <td style="padding: 10px; border: 1px solid var(--line); text-align: right; font-weight: 600;">${money(p.preco)}</td>
+                        <td style="padding: 10px; border: 1px solid var(--line); text-align: center;">
+                            <b>${qtdInt} un</b> <small style="color:var(--muted)">(${qtdEquiv.toFixed(1)} / +${sobra} ovos)</small>
+                        </td>
+                        <td style="padding: 10px; border: 1px solid var(--line); text-align: right; font-weight: bold; color: var(--green);">
+                            ${money(valorEst)}
+                        </td>
+                    </tr>
+                `;
+            }).join("");
+        }
+    }
+
+    // 4. Detalhamento por Tipo de Ovo (Grande, Médio, Pequeno)
+    const tiposMap = {};
+    coletasMes.forEach(c => {
+        const tipo = c.tipo || "Grande";
+        if (!tiposMap[tipo]) {
+            tiposMap[tipo] = { bruto: 0, perda: 0, liquido: 0 };
+        }
+        tiposMap[tipo].bruto += (c.bruto || 0);
+        tiposMap[tipo].perda += (c.perda || 0);
+        tiposMap[tipo].liquido += (c.liquido || 0);
+    });
+
+    const tiposKeys = Object.keys(tiposMap);
+    const typeSection = document.getElementById("prodReportTypeSection");
+    const typeContent = document.getElementById("prodReportTypeContent");
+
+    if (typeSection && typeContent) {
+        if (tiposKeys.length > 0) {
+            typeSection.style.display = "block";
+            typeContent.innerHTML = `
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px;">
+                    ${tiposKeys.map(tipo => {
+                        const dadosTipo = tiposMap[tipo];
+                        const band30 = (dadosTipo.liquido / 30).toFixed(1);
+                        const band12 = (dadosTipo.liquido / 12).toFixed(1);
+                        return `
+                            <div class="card" style="margin:0; padding: 12px; background: var(--surface-2); border: 1px solid var(--line);">
+                                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 6px;">
+                                    <b style="color: var(--ink); font-size: 1rem;">Ovos ${esc(tipo)}</b>
+                                    <span class="badge blue" style="font-size:0.7rem;">${dadosTipo.liquido.toLocaleString('pt-BR')} ovos</span>
+                                </div>
+                                <div style="font-size: 0.75rem; color: var(--muted); margin-bottom: 6px;">
+                                    Coletados: ${dadosTipo.bruto} · Perdas: ${dadosTipo.perda}
+                                </div>
+                                <div style="font-size: 0.8rem; border-top: 1px dashed var(--line); padding-top: 6px; display: flex; justify-content: space-between;">
+                                    <span>Bandejas 30: <b>${band30}</b></span>
+                                    <span>Bandejas 12: <b>${band12}</b></span>
+                                </div>
+                            </div>
+                        `;
+                    }).join("")}
+                </div>
+            `;
+        } else {
+            typeSection.style.display = "none";
+        }
+    }
+
+    // 5. Histórico diário
+    const dailyBody = document.getElementById("prodReportDailyBody");
+    const daysCountEl = document.getElementById("prodReportDaysCount");
+    if (daysCountEl) daysCountEl.textContent = `${coletasMes.length} registros (${diasComColeta} dias)`;
+
+    if (dailyBody) {
+        if (coletasMes.length === 0) {
+            dailyBody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:15px; color:var(--muted);">Nenhuma coleta registrada neste mês.</td></tr>';
+        } else {
+            dailyBody.innerHTML = coletasMes.map((c, idx) => {
+                const percPerda = c.bruto > 0 ? ((c.perda / c.bruto) * 100).toFixed(0) : "0";
+                const rowBg = idx % 2 === 1 ? "#f9fafb" : "#ffffff";
+                return `
+                    <tr style="background: ${rowBg};">
+                        <td style="padding: 8px 10px; border-bottom: 1px solid var(--line); font-weight: 500;">${formatarDataBR(c.data)}</td>
+                        <td style="padding: 8px 10px; border-bottom: 1px solid var(--line);">${esc(c.tipo)}</td>
+                        <td style="padding: 8px 10px; border-bottom: 1px solid var(--line); text-align: right;">${c.bruto}</td>
+                        <td style="padding: 8px 10px; border-bottom: 1px solid var(--line); text-align: right; color: ${c.perda > 0 ? 'var(--red)' : 'var(--muted)'};">
+                            ${c.perda} ${c.perda > 0 ? `<small style="font-size:0.65rem">(${percPerda}%)</small>` : ''}
+                        </td>
+                        <td style="padding: 8px 10px; border-bottom: 1px solid var(--line); text-align: right; font-weight: bold; color: var(--green);">${c.liquido}</td>
+                    </tr>
+                `;
+            }).join("");
+        }
+    }
+
+    document.getElementById("productionReportModal").style.display = "flex";
+}
+
+function closeProductionReportModal() {
+    document.getElementById("productionReportModal").style.display = "none";
+}
+
+function printProductionReport() {
+    const anoFiltro = dataPeriodoColeta.getFullYear();
+    const mesFiltro = dataPeriodoColeta.getMonth();
+    const nomeMes = NOMES_MESES[mesFiltro];
+    const title = `Relatório de Produção - ${nomeMes} de ${anoFiltro} - Granja Rancho do Viana`;
+
+    const kpisHtml = document.getElementById("prodReportKPIs")?.innerHTML || "";
+    const packagingHtml = document.getElementById("prodReportPackagingCards")?.innerHTML || "";
+    const tables = document.querySelectorAll("#productionReportModal table");
+    const productsTable = tables[0]?.outerHTML || "";
+    const dailyTable = tables[1]?.outerHTML || "";
+
+    const win = window.open("", "_blank");
+    win.document.write(`
+        <html>
+        <head>
+            <title>${title}</title>
+            <style>
+                @page { size: A4; margin: 15mm; }
+                body { font-family: 'Segoe UI', Arial, sans-serif; color: #172033; padding: 20px; line-height: 1.4; font-size: 12px; }
+                .header { text-align: center; border-bottom: 2px solid #2563eb; padding-bottom: 12px; margin-bottom: 20px; }
+                .header h1 { margin: 0; font-size: 22px; color: #172033; text-transform: uppercase; }
+                .header p { margin: 4px 0 0; color: #2563eb; font-weight: bold; font-size: 14px; }
+                .kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 20px; }
+                .kpi-card { border: 1px solid #cbd5e1; border-radius: 8px; padding: 10px; text-align: center; background: #f8fafc; }
+                .section-title { font-size: 13px; font-weight: bold; color: #172033; margin: 16px 0 8px; border-bottom: 1px solid #e2e8f0; padding-bottom: 4px; }
+                table { width: 100%; border-collapse: collapse; margin-bottom: 15px; font-size: 11px; }
+                th, td { border: 1px solid #dfe7ef; padding: 6px 8px; text-align: left; }
+                th { background: #f1f5f9; font-weight: bold; }
+                tr:nth-child(even) { background: #fafafa; }
+                .footer { margin-top: 30px; text-align: center; font-size: 10px; color: #64748b; border-top: 1px solid #e2e8f0; padding-top: 8px; }
+            </style>
+        </head>
+        <body>
+            <div class="header">
+                <h1>Granja Rancho do Viana</h1>
+                <p>Relatório de Produção Mensal - ${nomeMes} / ${anoFiltro}</p>
+                <small style="color: #64748b;">Emitido em: ${formatarDataBR(today)}</small>
+            </div>
+
+            <div class="section-title">Indicadores de Produção</div>
+            <div class="kpis">
+                ${kpisHtml}
+            </div>
+
+            <div class="section-title">Projeção por Produtos Cadastrados (Aba Dados)</div>
+            ${productsTable}
+
+            <div class="section-title">Histórico de Coletas Diárias</div>
+            ${dailyTable}
+
+            <div class="footer">
+                Granja Rancho do Viana • Sistema de Gestão Avícola
+            </div>
+        </body>
+        </html>
+    `);
+    win.document.close();
+    win.onload = () => win.print();
+}
+
 function atualizarBarra(p, t) {
     const container = document.getElementById("syncProgressContainer");
     const barra = document.getElementById("syncProgressBar");
@@ -2535,19 +2996,20 @@ function resetApp() {
 function setDefaultDates() {
     const saleDate = document.getElementById("saleDate");
     const prodDate = document.getElementById("prodDate");
+    const modalProdDate = document.getElementById("modalProdDate");
     const expenseDate = document.getElementById("expenseDate");
-    const coletaMonth = document.getElementById("filtroDataColeta");
 
     // Removemos o "!value" destes campos para FORÇAR a data de hoje ao abrir o app
     if (saleDate) saleDate.value = today;
     if (prodDate) prodDate.value = today;
-    if (expenseDate) expenseDate.value = today; // Agora vai funcionar!
-    if (coletaMonth && !coletaMonth.value) coletaMonth.value = today.slice(0, 7);
+    if (modalProdDate) modalProdDate.value = today;
+    if (expenseDate) expenseDate.value = today;
 }
 
 function bindForms() {
     document.getElementById("saleForm")?.addEventListener("submit", handleSale);
     document.getElementById("productionForm")?.addEventListener("submit", handleProduction);
+    document.getElementById("modalProductionForm")?.addEventListener("submit", handleModalProduction);
     document.getElementById("expenseForm")?.addEventListener("submit", handleExpense);
     document.getElementById("insumoForm")?.addEventListener("submit", handleInsumo);
     document.getElementById("insumoEditForm")?.addEventListener("submit", handleInsumoEdit);
@@ -2558,7 +3020,7 @@ function bindForms() {
     document.getElementById("editForm")?.addEventListener("submit", handleEdit);
 
     document.getElementById("filterType")?.addEventListener("change", renderExtract);
-    document.getElementById("filtroDataColeta")?.addEventListener("input", renderColetas);
+    document.getElementById("coletaEditForm")?.addEventListener("submit", handleColetaEdit);
 
     // Adiciona o listener para atualizar a visibilidade da data ao mudar o status
     document.getElementById("editStatus")?.addEventListener("change", togglePaymentDateField);

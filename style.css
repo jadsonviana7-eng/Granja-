@@ -882,6 +882,76 @@
     flex: 1;
 }
 
+/* ─── Navegador de Período de Coletas (Aba Produção) ─── */
+.period-navigator-coletas {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: var(--surface-2);
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    padding: 4px 8px;
+    margin: 0 auto 16px auto;
+    max-width: 280px;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.btn-nav-periodo-coleta {
+    background: #ffffff;
+    border: 1px solid var(--line);
+    color: var(--ink);
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    flex-shrink: 0;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.btn-nav-periodo-coleta:hover {
+    background: var(--blue);
+    color: #ffffff;
+    border-color: var(--blue);
+    transform: scale(1.08);
+}
+
+.btn-nav-periodo-coleta:active {
+    transform: scale(0.92);
+}
+
+.periodo-coleta-label {
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: var(--ink);
+    letter-spacing: 0.3px;
+    text-transform: capitalize;
+    user-select: none;
+    text-align: center;
+    flex: 1;
+}
+
+/* ─── Responsividade da Aba Produção ─── */
+.mobile-only-coleta-btn {
+    display: none;
+}
+
+@media (max-width: 820px) {
+    .mobile-only-coleta-btn {
+        display: block !important;
+    }
+    .desktop-production-form {
+        display: none !important;
+    }
+    .producao-grid {
+        grid-template-columns: 1fr !important;
+    }
+}
+
 /* ─── Seletor de Período Financeiro ─── */
 .periodo-selector {
     display: flex;
