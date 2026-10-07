@@ -687,12 +687,36 @@ function renderExtract() {
     const end = extratoFim;
     const type = document.getElementById("filterType")?.value || "TODOS";
 
-    // 1. Filtramos os dados normalmente
-    let filtrado = db.historico.filter(item => {
+    // Todos os itens no período de data para o sumário
+    const itensNoPeriodo = db.historico.filter(item => {
         const itemDataISO = dateToISO(item.data);
         const matchDate = (!start || itemDataISO >= start) && (!end || itemDataISO <= end);
+        return matchDate && (item.tipo === "VENDA" || item.tipo === "SAIDA");
+    });
+
+    // Cálculos do Sumário Discreto
+    const sumEntradas = itensNoPeriodo.filter(h => h.tipo === "VENDA").reduce((acc, h) => acc + (Number(h.valor) || 0), 0);
+    const sumSaidas = itensNoPeriodo.filter(h => h.tipo === "SAIDA").reduce((acc, h) => acc + (Number(h.valor) || 0), 0);
+    const sumPendentes = itensNoPeriodo.filter(h => h.tipo === "VENDA" && String(h.status || "").toLowerCase() === "pendente").reduce((acc, h) => acc + (Number(h.valor) || 0), 0);
+    const sumSaldo = sumEntradas - sumSaidas;
+
+    const elEntradas = document.getElementById("vendaSumEntradas");
+    const elSaidas = document.getElementById("vendaSumSaidas");
+    const elSaldo = document.getElementById("vendaSumSaldo");
+    const elPendentes = document.getElementById("vendaSumPendentes");
+
+    if (elEntradas) elEntradas.textContent = money(sumEntradas);
+    if (elSaidas) elSaidas.textContent = money(sumSaidas);
+    if (elSaldo) {
+        elSaldo.textContent = money(sumSaldo);
+        elSaldo.style.color = sumSaldo >= 0 ? "var(--green)" : "var(--red)";
+    }
+    if (elPendentes) elPendentes.textContent = money(sumPendentes);
+
+    // 1. Filtramos os dados para a listagem
+    let filtrado = itensNoPeriodo.filter(item => {
         const matchType = type === "TODOS" || item.tipo === type;
-        return matchDate && matchType && (item.tipo === "VENDA" || item.tipo === "SAIDA");
+        return matchType;
     });
 
     // 2. ORDENAÇÃO: Da data mais recente para a mais antiga
