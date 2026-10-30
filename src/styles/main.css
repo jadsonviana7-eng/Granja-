@@ -1,0 +1,9 @@
+@import '@fortawesome/fontawesome-free/css/all.min.css';
+@import 'cropperjs/dist/cropper.min.css';
+@import 'flatpickr/dist/flatpickr.min.css';
+
+@import './variables.css';
+@import './layout.css';
+@import './components.css';
+@import './pages.css';
+

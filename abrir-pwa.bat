@@ -1,24 +1,17 @@
 @echo off
 cd /d "%~dp0"
 
-set "NODE_EXE=node"
-where node >nul 2>nul
+where npm >nul 2>nul
 if errorlevel 1 (
-  if exist "%LOCALAPPDATA%\OpenAI\Codex\bin\node.exe" (
-    set "NODE_EXE=%LOCALAPPDATA%\OpenAI\Codex\bin\node.exe"
-  ) else (
-    echo Node.js nao encontrado. Instale o Node.js ou abra este projeto por um servidor local/HTTPS.
-    pause
-    exit /b 1
-  )
-)
-
-if not exist "server.cjs" (
-  echo Erro: Arquivo server.cjs nao encontrado no diretorio atual.
+  echo Node.js / npm nao encontrado. Instale o Node.js para iniciar o servidor Vite.
   pause
   exit /b 1
 )
 
-start "Granja PWA" cmd /k "%NODE_EXE%" server.cjs
-timeout /t 5 /nobreak >nul
-start "" "http://localhost:8765/?v=%RANDOM%"
+if not exist "node_modules" (
+  echo Instalando dependencias do projeto...
+  call npm install
+)
+
+start "" "http://localhost:8765/"
+call npm run dev
