@@ -1,5 +1,3 @@
-import './styles/main.css';
-
 import { STORE_KEY } from './config/constants.js';
 import { registerRenderCallback, loadDb, save } from './state/store.js';
 import {

@@ -15,6 +15,10 @@ window.addEventListener("beforeinstallprompt", (event) => {
 });
 
 export function setupPwaInstallButton() {
+    if ("serviceWorker" in navigator) {
+        navigator.serviceWorker.register("./sw.js").catch(() => {});
+    }
+
     const installButton = document.getElementById("installAppBtn");
     const installSection = document.getElementById("pwa-install-section");
     if (!installButton) return;

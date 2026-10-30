@@ -13,8 +13,8 @@ import {
 import { getInsumoUnit, getPhaseLabel } from '../utils/formatters.js';
 import { toast } from '../utils/icons.js';
 
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || "https://kbmvwzzdisvefkseztua.supabase.co";
-const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtibXZ3enpkaXN2ZWZrc2V6dHVhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODExNDg1NzEsImV4cCI6MjA5NjcyNDU3MX0.9PQuzAC_oxsjM5MnWw_f9a_9B-WpgfWe2IPhogiRGnQ";
+const SUPABASE_URL = import.meta.env?.VITE_SUPABASE_URL || "https://kbmvwzzdisvefkseztua.supabase.co";
+const SUPABASE_KEY = import.meta.env?.VITE_SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtibXZ3enpkaXN2ZWZrc2V6dHVhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODExNDg1NzEsImV4cCI6MjA5NjcyNDU3MX0.9PQuzAC_oxsjM5MnWw_f9a_9B-WpgfWe2IPhogiRGnQ";
 
 export const supabaseClient = createClient(SUPABASE_URL, SUPABASE_KEY);
 

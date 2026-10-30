@@ -128,7 +128,7 @@ function buildSingleInvoiceHtml(sale, copyLabel = "", compact = false) {
     const dataPagBR = sale.dataPagamento ? formatarDataBR(sale.dataPagamento) : (isPago ? dataVendaBR : "");
 
     const numRecibo = String(sale.id || "").slice(-6).padStart(6, "0");
-    const logoUrl = `${window.location.origin}/img/logo.png`;
+    const logoUrl = new URL('logo.png', window.location.href).href;
 
     const metaLines = [];
     if (emp.documento) {
