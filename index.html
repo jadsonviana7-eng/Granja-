@@ -37,6 +37,20 @@
         }
     }
     </script>
+    <script>
+        window.__deferredPwaPrompt = null;
+        window.addEventListener("beforeinstallprompt", function (e) {
+            e.preventDefault();
+            window.__deferredPwaPrompt = e;
+            var sec = document.getElementById("pwa-install-section");
+            if (sec) sec.style.display = "block";
+            var dropBtn = document.getElementById("dropdownInstallBtn");
+            if (dropBtn) dropBtn.style.display = "flex";
+        });
+        if ("serviceWorker" in navigator) {
+            navigator.serviceWorker.register("./sw.js").catch(function () { });
+        }
+    </script>
 </head>
 
 <body>
@@ -100,8 +114,6 @@
             <!-- Seção de Instalação PWA (Aparece apenas se suportado) -->
             <div id="pwa-install-section" style="display: none;">
                 <hr style="border: 0; border-top: 1px solid var(--line); margin: 20px 0;">
-                <p style="font-size: 0.8rem; color: var(--muted); margin-bottom: 10px;">Acesse mais rápido instalando o
-                    app</p>
                 <button type="button" id="installAppBtn" class="btn-pwa-install">
                     <i class="fas fa-cloud-download-alt"></i> Instalar Aplicativo
                 </button>
@@ -133,6 +145,8 @@
                         <b id="dropdown-name">Nome</b>
                         <span id="dropdown-role" class="badge blue">Perfil</span>
                     </div>
+                    <button id="dropdownInstallBtn" type="button" class="dropdown-item" style="display: none;"><i
+                            class="fas fa-cloud-download-alt"></i> Instalar Aplicativo</button>
                     <button onclick="showPage('page-configuracoes')" class="dropdown-item"><i
                             class="fas fa-user-edit"></i> Editar Perfil</button>
                     <button onclick="handleLogout()" class="dropdown-item logout"><i class="fas fa-sign-out-alt"></i>

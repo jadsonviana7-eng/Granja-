@@ -5,13 +5,21 @@ import { renderPlantel } from '../domain/estoque.js';
 import { esc } from '../utils/formatters.js';
 import { iconSvg, makeHeaderIcon, toast } from '../utils/icons.js';
 
-let deferredInstallPrompt = null;
+function isStandaloneMode() {
+    return (
+        window.matchMedia("(display-mode: standalone)").matches ||
+        window.matchMedia("(display-mode: minimal-ui)").matches ||
+        window.navigator.standalone === true
+    );
+}
 
 window.addEventListener("beforeinstallprompt", (event) => {
     event.preventDefault();
-    deferredInstallPrompt = event;
+    window.__deferredPwaPrompt = event;
     const installSection = document.getElementById("pwa-install-section");
     if (installSection) installSection.style.display = "block";
+    const dropBtn = document.getElementById("dropdownInstallBtn");
+    if (dropBtn) dropBtn.style.display = "flex";
 });
 
 export function setupPwaInstallButton() {
@@ -21,23 +29,47 @@ export function setupPwaInstallButton() {
 
     const installButton = document.getElementById("installAppBtn");
     const installSection = document.getElementById("pwa-install-section");
-    if (!installButton) return;
+    const dropBtn = document.getElementById("dropdownInstallBtn");
 
-    installButton.addEventListener("click", async () => {
-        if (!deferredInstallPrompt) return;
-        if (installSection) installSection.style.display = "none";
-        deferredInstallPrompt.prompt();
-        await deferredInstallPrompt.userChoice;
-        deferredInstallPrompt = null;
-    });
+    // Sempre exibe o botão quando aberto no navegador (fora do app instalado)
+    if (!isStandaloneMode()) {
+        if (installSection) installSection.style.display = "block";
+        if (dropBtn) dropBtn.style.display = "flex";
+    }
 
-    if (deferredInstallPrompt && installSection) {
-        installSection.style.display = "block";
+    const triggerInstall = async () => {
+        const promptEvent = window.__deferredPwaPrompt;
+        if (promptEvent) {
+            promptEvent.prompt();
+            const choice = await promptEvent.userChoice;
+            if (choice && choice.outcome === "accepted") {
+                if (installSection) installSection.style.display = "none";
+                if (dropBtn) dropBtn.style.display = "none";
+                window.__deferredPwaPrompt = null;
+            }
+            return;
+        }
+
+        const ua = navigator.userAgent || "";
+        const isIOS = /iPad|iPhone|iPod/.test(ua) && !window.MSStream;
+        if (isIOS) {
+            toast("No iPhone/iPad: toque em Compartilhar e depois em 'Adicionar à Tela de Início'.");
+        } else {
+            toast("Abra o menu do navegador (⋮) e selecione 'Instalar aplicativo' ou 'Adicionar à tela inicial'.");
+        }
+    };
+
+    if (installButton) {
+        installButton.addEventListener("click", triggerInstall);
+    }
+    if (dropBtn) {
+        dropBtn.addEventListener("click", triggerInstall);
     }
 
     window.addEventListener("appinstalled", () => {
         if (installSection) installSection.style.display = "none";
-        deferredInstallPrompt = null;
+        if (dropBtn) dropBtn.style.display = "none";
+        window.__deferredPwaPrompt = null;
         toast("App instalado com sucesso!");
     });
 }
