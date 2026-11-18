@@ -32,7 +32,7 @@ export default defineConfig({
         display_override: ['standalone', 'minimal-ui'],
         orientation: 'portrait-primary',
         background_color: '#e2e8f0',
-        theme_color: '#172033',
+        theme_color: '#e2e8f0',
         categories: ['business', 'productivity', 'finance'],
         icons: [
           {

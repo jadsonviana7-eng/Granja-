@@ -1,10 +1,10 @@
-const CACHE_NAME = "granja-viana-pwa-v5.0";
+const CACHE_NAME = "granja-viana-pwa-v5.1";
 const APP_SHELL = [
   "./index.html",
-  "./manifest.webmanifest",
+  "./manifest.webmanifest?v=2",
   "./logo.png",
-  "./icons/icon-192.png",
-  "./icons/icon-512.png",
+  "./icons/icon-192.png?v=2",
+  "./icons/icon-512.png?v=2",
   "./src/styles/variables.css",
   "./src/styles/layout.css",
   "./src/styles/components.css",
