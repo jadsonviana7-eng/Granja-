@@ -1,6 +1,6 @@
 import { NOMES_MESES, COMPANY_STORE_KEY, DEFAULT_EMPRESA } from '../config/constants.js';
 import { state, save, normalizeEmpresa, isCurrentUserAdmin } from '../state/store.js';
-import { dbSalvarDadosEmpresa } from '../services/supabase.js';
+import { supabaseClient, dbSalvarDadosEmpresa } from '../services/supabase.js';
 import { registrarLog } from '../services/logger.js';
 import { dateToISO, formatarDataBR, esc, money, formatNumber, getTodayISO, formatarCpfCnpj } from '../utils/formatters.js';
 import { toast } from '../utils/icons.js';
@@ -48,6 +48,90 @@ export function renderCompanyConfig() {
     toggleWhatsappApiFields();
 }
 
+function shouldUseSupabaseBridgeOnly(baseUrl) {
+    const isHttpsPage = window.location.protocol === "https:";
+    const isHttpLocalTarget = /^http:\/\/(localhost|127\.0\.0\.1)\b/i.test(baseUrl);
+    return isHttpsPage && isHttpLocalTarget;
+}
+
+async function readSupabaseWhatsappBridgeStatus() {
+    if (!supabaseClient) return null;
+    const { data: row, error } = await supabaseClient
+        .from("granja_data")
+        .select("db_content")
+        .order("updated_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+    if (error || !row?.db_content?.whatsapp_bridge) return null;
+    const bridge = row.db_content.whatsapp_bridge;
+    // Verifica se o servidor atualizou o heartbeat nos últimos 45 segundos
+    if (bridge.heartbeat && (Date.now() - bridge.heartbeat > 45000)) {
+        return null;
+    }
+    return bridge;
+}
+
+async function executeSupabaseWhatsappBridgeCmd(cmdPayload, timeoutMs = 20000) {
+    if (!supabaseClient) {
+        throw new Error("Sem conexão com o banco para comunicar com o servidor WhatsApp.");
+    }
+    const { data: row, error: selErr } = await supabaseClient
+        .from("granja_data")
+        .select("id, db_content")
+        .order("updated_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+    if (selErr || !row) {
+        throw new Error("Servidor WhatsApp não encontrado no banco.");
+    }
+
+    const content = (row.db_content && typeof row.db_content === "object") ? row.db_content : {};
+    const bridge = content.whatsapp_bridge;
+    if (!bridge || (bridge.heartbeat && (Date.now() - bridge.heartbeat > 45000))) {
+        throw new Error("O servidor WhatsApp do PC está desligado. Deixe o 'abrir-pwa.bat' ou 'npm run whatsapp' aberto no PC.");
+    }
+
+    const cmdId = Date.now() + "_" + Math.random().toString(36).slice(2, 7);
+    content.whatsapp_cmd = {
+        id: cmdId,
+        ...cmdPayload,
+        status: "pending",
+        createdAt: Date.now()
+    };
+
+    const { error: updErr } = await supabaseClient
+        .from("granja_data")
+        .update({ db_content: content })
+        .eq("id", row.id);
+
+    if (updErr) {
+        throw new Error("Falha ao enviar comando para a ponte WhatsApp: " + updErr.message);
+    }
+
+    const startTime = Date.now();
+    while (Date.now() - startTime < timeoutMs) {
+        await new Promise(r => setTimeout(r, 1400));
+        const { data: checkRow } = await supabaseClient
+            .from("granja_data")
+            .select("db_content")
+            .eq("id", row.id)
+            .maybeSingle();
+
+        const currentCmd = checkRow?.db_content?.whatsapp_cmd;
+        if (currentCmd && currentCmd.id === cmdId) {
+            if (currentCmd.status === "done") {
+                return currentCmd.result || {};
+            }
+            if (currentCmd.status === "error") {
+                throw new Error(currentCmd.error || "Erro retornado pelo servidor WhatsApp.");
+            }
+        }
+    }
+
+    throw new Error("O servidor WhatsApp demorou para responder. Verifique se o terminal do servidor está aberto.");
+}
+
 export async function checkSelfHostedWhatsappStatus(showFeedback = false) {
     const provider = document.getElementById("whatsappApiProvider")?.value || "";
     if (provider !== "proprio") return;
@@ -59,10 +143,25 @@ export async function checkSelfHostedWhatsappStatus(showFeedback = false) {
     const btnLogout = document.getElementById("btnWhatsappSelfLogout");
     const badge = document.getElementById("whatsappApiStatusBadge");
 
+    let data = null;
     try {
-        const res = await fetch(`${baseUrl}/status`, { method: "GET" });
-        const data = await res.json();
+        if (!shouldUseSupabaseBridgeOnly(baseUrl)) {
+            const res = await fetch(`${baseUrl}/status`, { method: "GET" });
+            data = await res.json();
+        }
+    } catch (_) {
+        data = null;
+    }
 
+    if (!data) {
+        try {
+            data = await readSupabaseWhatsappBridgeStatus();
+        } catch (_) {
+            data = null;
+        }
+    }
+
+    if (data) {
         if (data.connected) {
             if (statusText) {
                 statusText.innerHTML = `<span style="color: var(--green); font-weight: 800;">🟢 Conectado ao WhatsApp: ${esc(data.user?.name || "")} (${esc(data.user?.id || "")})</span>`;
@@ -77,13 +176,13 @@ export async function checkSelfHostedWhatsappStatus(showFeedback = false) {
             if (showFeedback) toast("WhatsApp conectado e pronto para enviar PDFs!");
         } else if (data.qrDataUrl) {
             if (statusText) {
-                statusText.innerHTML = `<span style="color: #b45309; font-weight: 700;">🟡 Aguardando leitura do QR Code abaixo...</span>`;
+                statusText.innerHTML = `<span style="color: #b45309; font-weight: 700;">🟡 Aguardando leitura do QR Code ou Código de 8 dígitos...</span>`;
             }
             if (qrImg) qrImg.src = data.qrDataUrl;
             if (qrBox) qrBox.style.display = "block";
             if (btnLogout) btnLogout.style.display = "none";
             if (badge) {
-                badge.textContent = "Aguardando QR Code";
+                badge.textContent = "Aguardando Conexão";
                 badge.className = "badge amber";
                 badge.style.display = "inline-flex";
             }
@@ -94,30 +193,41 @@ export async function checkSelfHostedWhatsappStatus(showFeedback = false) {
             if (qrBox) qrBox.style.display = "none";
             if (btnLogout) btnLogout.style.display = "none";
         }
-    } catch (err) {
-        if (statusText) {
-            statusText.innerHTML = `<span style="color: var(--red); font-weight: 700;">🔴 Servidor local não detectado em ${esc(baseUrl)}. Inicie com <code>npm run whatsapp</code> ou <code>abrir-pwa.bat</code>.</span>`;
-        }
-        if (qrBox) qrBox.style.display = "none";
-        if (btnLogout) btnLogout.style.display = "none";
-        if (badge) {
-            badge.textContent = "Servidor Offline";
-            badge.className = "badge red";
-            badge.style.display = "inline-flex";
-        }
-        if (showFeedback) toast("Servidor WhatsApp offline. Inicie com 'npm run whatsapp'.");
+        return;
     }
+
+    if (statusText) {
+        statusText.innerHTML = `<span style="color: var(--red); font-weight: 700;">🔴 Servidor não detectado. Deixe <code>npm run whatsapp</code> ou <code>abrir-pwa.bat</code> rodando no PC.</span>`;
+    }
+    if (qrBox) qrBox.style.display = "none";
+    if (btnLogout) btnLogout.style.display = "none";
+    if (badge) {
+        badge.textContent = "Servidor Offline";
+        badge.className = "badge red";
+        badge.style.display = "inline-flex";
+    }
+    if (showFeedback) toast("Servidor WhatsApp offline. Inicie com 'npm run whatsapp'.");
 }
 
 export async function logoutSelfHostedWhatsapp() {
     if (!confirm("Deseja desconectar o número atual do WhatsApp e gerar um novo QR Code?")) return;
     const baseUrl = (document.getElementById("whatsappApiUrl")?.value.trim() || "http://localhost:3001").replace(/\/+$/, "");
     try {
-        await fetch(`${baseUrl}/logout`, { method: "POST" });
+        if (!shouldUseSupabaseBridgeOnly(baseUrl)) {
+            await fetch(`${baseUrl}/logout`, { method: "POST" });
+        } else {
+            await executeSupabaseWhatsappBridgeCmd({ action: "logout" });
+        }
         toast("Sessão desconectada! Gerando novo QR Code...");
         setTimeout(() => checkSelfHostedWhatsappStatus(false), 1800);
     } catch (err) {
-        toast("Erro ao desconectar: " + err.message);
+        try {
+            await executeSupabaseWhatsappBridgeCmd({ action: "logout" });
+            toast("Sessão desconectada! Gerando novo QR Code...");
+            setTimeout(() => checkSelfHostedWhatsappStatus(false), 1800);
+        } catch (bridgeErr) {
+            toast("Erro ao desconectar: " + bridgeErr.message);
+        }
     }
 }
 
@@ -137,15 +247,24 @@ export async function requestSelfHostedPairingCode() {
     }
 
     try {
-        const res = await fetch(`${baseUrl}/pair-code`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ phone: numeroInformado })
-        });
-        const data = await res.json();
-        if (!res.ok || !data.ok) {
-            throw new Error(data.error || "Erro ao gerar código");
+        let data = null;
+        if (!shouldUseSupabaseBridgeOnly(baseUrl)) {
+            try {
+                const res = await fetch(`${baseUrl}/pair-code`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ phone: numeroInformado })
+                });
+                const json = await res.json();
+                if (!res.ok || !json.ok) throw new Error(json.error || "Erro ao gerar código");
+                data = json;
+            } catch (directErr) {
+                data = await executeSupabaseWhatsappBridgeCmd({ action: "pair-code", phone: numeroInformado });
+            }
+        } else {
+            data = await executeSupabaseWhatsappBridgeCmd({ action: "pair-code", phone: numeroInformado });
         }
+
         if (codeBox) {
             codeBox.innerHTML = `Código: <span style="user-select:all;">${esc(data.code)}</span><div style="font-size:0.75rem; font-weight:600; letter-spacing:0; margin-top:4px; color:#047857;">No WhatsApp → Aparelhos Conectados → Conectar com número de telefone → Digite o código acima</div>`;
         }
@@ -1375,8 +1494,7 @@ async function sendPdfViaWhatsappApi({ emp, phoneDDI, clienteNome, pdfBlob, file
 
     if (provider === "proprio") {
         const targetUrl = baseUrl || "http://localhost:3001";
-        url = `${targetUrl}/send-receipt`;
-        body = {
+        const payload = {
             phone: phoneDDI,
             clientName: clienteNome,
             fileName,
@@ -1384,6 +1502,27 @@ async function sendPdfViaWhatsappApi({ emp, phoneDDI, clienteNome, pdfBlob, file
             caption,
             pdfBase64: base64Pure
         };
+
+        if (!shouldUseSupabaseBridgeOnly(targetUrl)) {
+            try {
+                const res = await fetch(`${targetUrl}/send-receipt`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(payload)
+                });
+                const json = await res.json().catch(() => ({}));
+                if (!res.ok || !json.ok) {
+                    throw new Error(json.error || `Erro HTTP ${res.status}`);
+                }
+                return true;
+            } catch (directErr) {
+                await executeSupabaseWhatsappBridgeCmd({ action: "send-receipt", ...payload }, 30000);
+                return true;
+            }
+        } else {
+            await executeSupabaseWhatsappBridgeCmd({ action: "send-receipt", ...payload }, 30000);
+            return true;
+        }
     } else if (provider === "evolution") {
         if (!baseUrl || !instance || !token) {
             throw new Error("Configure URL, Instância e API Key da Evolution API nos Ajustes.");
@@ -1494,13 +1633,8 @@ export async function sendSaleReceiptWhatsApp() {
 
     const hasReadyCache = cachedReceiptPdf && cachedReceiptPdf.saleId === Number(sale.id) && cachedReceiptPdf.mode === mode;
 
-    const isMobileDevice = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent || "");
-    const apiBaseUrl = String(emp.whatsappApiUrl || "").trim();
-    const isLocalhostUrl = !apiBaseUrl || /^https?:\/\/(localhost|127\.0\.0\.1)\b/i.test(apiBaseUrl);
-    const canUseApiFromHere = Boolean(emp.whatsappApiProvider) && !(isMobileDevice && emp.whatsappApiProvider === "proprio" && isLocalhostUrl);
-
-    // 1) Se a API de WhatsApp estiver configurada e acessível pelo dispositivo atual (PC ou URL HTTPS na nuvem):
-    if (canUseApiFromHere) {
+    // 1) Se a API de WhatsApp estiver configurada (funciona tanto pelo PC quanto pelo celular via Ponte em Nuvem do Supabase!):
+    if (emp.whatsappApiProvider) {
         let rawPhone = clienteCad?.telefone || "";
         let phoneDDI = normalizeWhatsappNumber(rawPhone);
 

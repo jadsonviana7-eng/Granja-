@@ -735,7 +735,7 @@
                                 </select>
                             </div>
 
-                            <div id="whatsappSelfHostedPanel" style="display: none; margin-bottom: 14px; padding: 14px; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 10px;">
+                            <div id="whatsappSelfHostedPanel" style="display: block; margin-bottom: 14px; padding: 14px; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 10px;">
                                 <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
                                     <div>
                                         <div style="font-size: 0.85rem; font-weight: 800; color: var(--ink);">Status do Servidor WhatsApp da Granja:</div>
@@ -745,25 +745,20 @@
                                         <button type="button" class="btn ghost small" onclick="checkSelfHostedWhatsappStatus(true)">
                                             <i class="fas fa-sync-alt"></i> Atualizar Status / QR
                                         </button>
+                                        <button type="button" id="btnWhatsappPairingCode" class="btn blue small" onclick="requestSelfHostedPairingCode()">
+                                            <i class="fas fa-key"></i> Gerar Código para Conectar no Celular
+                                        </button>
                                         <button type="button" id="btnWhatsappSelfLogout" class="btn red small" onclick="logoutSelfHostedWhatsapp()" style="display: none;">
                                             <i class="fas fa-unlink"></i> Desconectar
                                         </button>
                                     </div>
                                 </div>
+                                <div id="whatsappPairingCodeResult" style="display: none; text-align: center; margin-top: 12px; padding: 12px; background: #ecfdf5; border: 1.5px solid #10b981; border-radius: 8px; font-size: 1.2rem; font-weight: 900; letter-spacing: 2px; color: #065f46;"></div>
                                 <div id="whatsappSelfQrBox" style="display: none; text-align: center; margin-top: 12px; padding-top: 12px; border-top: 1px dashed #cbd5e1;">
                                     <p style="margin: 0 0 8px; font-size: 0.82rem; font-weight: 700; color: #132a1c;">
-                                        📱 Opção 1 (Pelo PC): Escaneie o QR Code abaixo com o WhatsApp da Granja:
+                                        📱 Escaneie o QR Code abaixo com o WhatsApp da Granja (ou use o botão "Gerar Código" acima):
                                     </p>
                                     <img id="whatsappSelfQrImg" src="" alt="QR Code WhatsApp" style="width: 220px; height: 220px; border: 2px solid #1b7a43; border-radius: 12px; padding: 6px; background: #fff;">
-                                    <div style="margin-top: 12px; padding-top: 10px; border-top: 1px dashed #e2e8f0;">
-                                        <p style="margin: 0 0 8px; font-size: 0.8rem; font-weight: 700; color: #0f766e;">
-                                            📲 Opção 2 (Pelo próprio celular, sem câmera): Conectar com Código de 8 dígitos
-                                        </p>
-                                        <button type="button" class="btn blue small" onclick="requestSelfHostedPairingCode()">
-                                            <i class="fas fa-key"></i> Gerar Código para Conectar no Celular
-                                        </button>
-                                        <div id="whatsappPairingCodeResult" style="display: none; margin-top: 10px; padding: 10px; background: #ecfdf5; border: 1.5px solid #10b981; border-radius: 8px; font-size: 1.2rem; font-weight: 900; letter-spacing: 2px; color: #065f46;"></div>
-                                    </div>
                                 </div>
                             </div>
 
