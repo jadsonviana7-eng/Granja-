@@ -1155,33 +1155,21 @@ export async function sendSaleReceiptWhatsApp() {
              String(c.nome || "").trim().toLowerCase() === String(clienteNome).trim().toLowerCase()
     );
 
-    const produtoNome = sale.produto || "Ovos / Produto da Granja";
-    const produtoCad = (db.produtos || []).find(
-        p => String(p.id) === String(sale.produto_id) ||
-             String(p.nome || "").trim().toLowerCase() === String(produtoNome).trim().toLowerCase()
-    );
+    const nomeEmpresa = emp.nome || DEFAULT_EMPRESA.nome;
+    const rodapeAgradecimento = emp.mensagemRodape || DEFAULT_EMPRESA.mensagemRodape;
+    const msgAgradecimento = `Olá, *${clienteNome}*! Segue o recibo referente à sua compra na *${nomeEmpresa}*.\n\n${rodapeAgradecimento}`;
 
-    const qtd = Number(sale.qtd ?? sale.quantidade) || 1;
-    const valorUnitario = Number(sale.valorUnitario ?? sale.valor_unitario) || (qtd > 0 ? (Number(sale.valor) || 0) / qtd : 0);
-    const subtotalBruto = qtd * valorUnitario;
-    const desconto = Number(sale.desconto) || 0;
-    const valorTotal = Number(sale.valor ?? sale.valor_total) || Math.max(0, subtotalBruto - desconto);
-    const numRecibo = String(sale.id || "").slice(-6).padStart(6, "0");
-
-    // 1) Se o PDF já está pré-carregado no cache, chama navigator.share() IMEDIATAMENTE (sem nenhum await antes!)
-    // para que o Android/iOS reconheça o toque direto do usuário (user gesture).
-    const isMobileDevice = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent || "");
+    // 1) Se o PDF já está pré-carregado no cache, compartilha o arquivo PDF + mensagem de agradecimento (sem nenhum link)
     const hasReadyCache = cachedReceiptPdf && cachedReceiptPdf.saleId === Number(sale.id) && cachedReceiptPdf.mode === mode;
 
-    if (isMobileDevice && hasReadyCache && navigator.canShare && navigator.canShare({ files: [cachedReceiptPdf.pdfFile] })) {
+    if (hasReadyCache && navigator.canShare && navigator.canShare({ files: [cachedReceiptPdf.pdfFile] })) {
         try {
-            const shareCaption = `Recibo Nº ${numRecibo} - ${emp.nome || DEFAULT_EMPRESA.nome}\nCliente: ${clienteNome}${clienteCad?.telefone ? ` (${clienteCad.telefone})` : ""}\nTotal: ${money(valorTotal)}`;
             await navigator.share({
                 files: [cachedReceiptPdf.pdfFile],
                 title: cachedReceiptPdf.fileName,
-                text: shareCaption
+                text: msgAgradecimento
             });
-            toast("PDF do recibo compartilhado com sucesso!");
+            toast("Recibo em PDF enviado com sucesso!");
             return;
         } catch (err) {
             if (err && err.name === "AbortError") return;
@@ -1204,13 +1192,8 @@ export async function sendSaleReceiptWhatsApp() {
             ...pdfData
         };
 
-        // Caso estivesse no celular mas o cache ainda não estivesse pronto no primeiro clique:
-        if (isMobileDevice && navigator.canShare && navigator.canShare({ files: [pdfData.pdfFile] })) {
-            toast("PDF pronto! Toque novamente em 'Enviar PDF' para abrir o WhatsApp.");
-            return;
-        }
-
-        // 2) No computador (ou navegadores sem compartilhamento nativo de arquivo):
+        // 2) Abre diretamente o contato cadastrado do cliente no WhatsApp com a mensagem de agradecimento (sem link)
+        // e baixa o arquivo PDF para anexar na conversa
         let rawPhone = clienteCad?.telefone || "";
         let phoneDDI = normalizeWhatsappNumber(rawPhone);
 
@@ -1228,27 +1211,9 @@ export async function sendSaleReceiptWhatsApp() {
 
         triggerBlobDownload(pdfData.pdfBlob, pdfData.fileName);
 
-        const linkPdfOnline = buildPublicReceiptPdfLink(sale, emp, clienteCad, produtoCad);
-        const statusAtual = String(sale.status || "pago").toLowerCase();
-        const isPago = statusAtual === "pago";
-        const dataVendaBR = formatarDataBR(sale.data || sale.data_transacao || getTodayISO());
-
-        const linhas = [];
-        linhas.push(`🥚 *${(emp.nome || DEFAULT_EMPRESA.nome).toUpperCase()}*`);
-        linhas.push(`🧾 *RECIBO DE VENDA Nº ${numRecibo}*`);
-        linhas.push(`📅 *Data:* ${dataVendaBR}`);
-        linhas.push(`👤 *Cliente:* ${clienteNome}`);
-        linhas.push(`📦 *Produto:* ${produtoNome} (${formatNumber(qtd)} ${sale.unidade || "un"})`);
-        linhas.push(`💰 *VALOR TOTAL: ${money(valorTotal)}* (${isPago ? "PAGO" : "PENDENTE"})`);
-        if (linkPdfOnline) {
-            linhas.push(`--------------------------------`);
-            linhas.push(`📄 *Clique abaixo para abrir e baixar seu Recibo em PDF:*`);
-            linhas.push(linkPdfOnline);
-        }
-
-        const whatsappUrl = `https://wa.me/${phoneDDI}?text=${encodeURIComponent(linhas.join("\n"))}`;
+        const whatsappUrl = `https://wa.me/${phoneDDI}?text=${encodeURIComponent(msgAgradecimento)}`;
         window.open(whatsappUrl, "_blank", "noopener,noreferrer");
-        toast(`PDF "${pdfData.fileName}" baixado! Anexe-o na conversa do WhatsApp de ${clienteNome}.`);
+        toast(`PDF "${pdfData.fileName}" baixado! Anexe o arquivo na conversa aberta com ${clienteNome}.`);
     } catch (err) {
         if (err && err.name === "AbortError") return;
         console.error("Erro ao gerar/enviar PDF do recibo:", err);
