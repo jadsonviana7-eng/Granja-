@@ -233,12 +233,13 @@ export async function logoutSelfHostedWhatsapp() {
 
 export async function requestSelfHostedPairingCode() {
     const baseUrl = (document.getElementById("whatsappApiUrl")?.value.trim() || "http://localhost:3001").replace(/\/+$/, "");
-    const emp = getEmpresaConfig();
+    const savedPairingPhone = localStorage.getItem("granjaViana_pairing_phone") || "";
     const numeroInformado = prompt(
-        "Informe o número do WhatsApp da Granja com DDD (apenas números, ex: 82988376401):",
-        (emp.telefone || "").replace(/\D/g, "")
+        "Digite o número do WhatsApp DESTE aparelho que você vai conectar (com DDD, ex: 82982289108):\n\n⚠️ Atenção: Deve ser exatamente o número do WhatsApp onde você vai digitar o código!",
+        savedPairingPhone
     );
     if (!numeroInformado) return;
+    localStorage.setItem("granjaViana_pairing_phone", numeroInformado.replace(/\D/g, ""));
 
     const codeBox = document.getElementById("whatsappPairingCodeResult");
     if (codeBox) {

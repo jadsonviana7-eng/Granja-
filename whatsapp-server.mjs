@@ -6,7 +6,8 @@ import { createClient } from "@supabase/supabase-js";
 import makeWASocket, {
     useMultiFileAuthState,
     DisconnectReason,
-    fetchLatestBaileysVersion
+    fetchLatestBaileysVersion,
+    Browsers
 } from "@whiskeysockets/baileys";
 import QRCode from "qrcode";
 import pino from "pino";
@@ -56,19 +57,49 @@ async function syncBridgeStatusToSupabase() {
 }
 
 async function generatePairingCodeForPhone(rawPhone) {
-    const digits = String(rawPhone || "").replace(/\D/g, "").replace(/^0+/, "");
-    const fullPhone = (digits.length === 10 || digits.length === 11) ? `55${digits}` : digits;
-
-    if (!fullPhone || fullPhone.length < 12) {
-        throw new Error("Informe o número do WhatsApp com DDD (ex: 82988376401).");
+    let digits = String(rawPhone || "").replace(/\D/g, "").replace(/^0+/, "");
+    if (digits.length === 10 || digits.length === 11) {
+        digits = `55${digits}`;
     }
+
+    if (!digits || digits.length < 12) {
+        throw new Error("Informe o número do WhatsApp com DDD (ex: 82982289108).");
+    }
+
+    // Reinicia a sessão não-registrada para garantir um socket limpo e janela completa de validade do código
+    if (sock && connectionStatus !== "connected") {
+        try {
+            sock.ev.removeAllListeners();
+            sock.ws?.close();
+        } catch (_) {}
+        sock = null;
+    }
+
+    try {
+        fs.rmSync(AUTH_DIR, { recursive: true, force: true });
+    } catch (_) {}
+
+    isReconnecting = false;
+    await startWhatsApp(true);
+
+    // Aguarda o socket entrar no estado de QR (pronto para solicitar código de pareamento)
+    for (let i = 0; i < 25; i++) {
+        if (sock && (connectionStatus === "qr" || sock.authState?.creds)) {
+            break;
+        }
+        await new Promise((r) => setTimeout(r, 300));
+    }
+
+    await new Promise((r) => setTimeout(r, 800));
+
     if (!sock) {
         throw new Error("Servidor ainda inicializando. Tente novamente em 3 segundos.");
     }
 
-    const code = await sock.requestPairingCode(fullPhone);
+    const code = await sock.requestPairingCode(digits);
     const formattedCode = code?.length === 8 ? `${code.slice(0, 4)}-${code.slice(4)}` : code;
-    return { code: formattedCode, phone: fullPhone };
+    console.log(`[WhatsApp API] Código de pareamento gerado para ${digits}: ${formattedCode}`);
+    return { code: formattedCode, phone: digits };
 }
 
 async function sendPdfDocumentToPhone({ phone, fileName, caption, pdfBase64 }) {
@@ -179,8 +210,8 @@ async function pollSupabaseBridgeCommands() {
     }
 }
 
-async function startWhatsApp() {
-    if (isReconnecting) return;
+async function startWhatsApp(forceFresh = false) {
+    if (isReconnecting && !forceFresh) return;
     isReconnecting = true;
 
     try {
@@ -198,9 +229,10 @@ async function startWhatsApp() {
         sock = makeWASocket({
             version,
             auth: state,
-            printQRInTerminal: true,
+            printQRInTerminal: false,
             logger: pino({ level: "silent" }),
-            browser: ["Granja Rancho do Viana", "Chrome", "2.0.0"],
+            // IMPORTANTE: O pareamento por código de 8 dígitos do WhatsApp exige assinatura oficial Ubuntu/Chrome
+            browser: Browsers.ubuntu("Chrome"),
             syncFullHistory: false,
             markOnlineOnConnect: false
         });
