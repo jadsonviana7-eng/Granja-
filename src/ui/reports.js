@@ -278,7 +278,7 @@ function buildSingleInvoiceHtml(sale, copyLabel = "", compact = false) {
     `;
 }
 
-export function getInvoiceStyles(mode = "single") {
+export function getInvoiceStyles(mode = "single", forPdf = false) {
     const padPreview = mode === "double" ? "14mm 16mm" : "18mm 20mm";
     const padPrint = mode === "double" ? "6mm 8mm" : "10mm 12mm";
 
@@ -680,7 +680,7 @@ export function getInvoiceStyles(mode = "single") {
             text-transform: uppercase;
             letter-spacing: 0.06em;
         }
-        @media screen and (max-width: 640px) {
+        ${forPdf ? "" : `@media screen and (max-width: 640px) {
             .a4-page-sheet {
                 padding: 16px 14px !important;
                 border-radius: 10px;
@@ -838,7 +838,7 @@ export function getInvoiceStyles(mode = "single") {
                 gap: 4px;
                 font-size: 9.5px;
             }
-        }
+        }`}
     `;
 }
 
@@ -897,11 +897,11 @@ export function renderReceiptPreview() {
     const lblZap = document.getElementById("btnWhatsappLabel");
     if (btnZap) {
         if (clienteCad?.telefone) {
-            btnZap.title = `Enviar recibo para ${clienteNome} (${clienteCad.telefone})`;
-            if (lblZap) lblZap.textContent = "WhatsApp";
+            btnZap.title = `Gerar PDF e enviar para ${clienteNome} (${clienteCad.telefone})`;
+            if (lblZap) lblZap.textContent = "Enviar PDF";
         } else {
-            btnZap.title = `Cliente sem telefone cadastrado — clique para informar o número e enviar`;
-            if (lblZap) lblZap.textContent = "WhatsApp";
+            btnZap.title = `Gerar PDF e enviar via WhatsApp`;
+            if (lblZap) lblZap.textContent = "Enviar PDF";
         }
     }
 }
@@ -918,7 +918,149 @@ function normalizeWhatsappNumber(rawPhone) {
     return digits.length >= 10 ? digits : "";
 }
 
-export function sendSaleReceiptWhatsApp() {
+function ensureHtml2PdfLoaded() {
+    if (typeof window.html2pdf === "function") {
+        return Promise.resolve(window.html2pdf);
+    }
+    return new Promise((resolve, reject) => {
+        const script = document.createElement("script");
+        script.src = "https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js";
+        script.onload = () => resolve(window.html2pdf);
+        script.onerror = () => reject(new Error("Falha ao carregar gerador de PDF"));
+        document.head.appendChild(script);
+    });
+}
+
+async function generateReceiptPdfFile(sale, mode = "single") {
+    const html2pdf = await ensureHtml2PdfLoaded();
+    const numRecibo = String(sale.id || "").slice(-6).padStart(6, "0");
+    const safeClient = String(sale.cliente || "Cliente")
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/[^a-zA-Z0-9_-]+/g, "_")
+        .replace(/^_+|_+$/g, "") || "Cliente";
+    const fileName = `Recibo_${numRecibo}_${safeClient}.pdf`;
+
+    let contentHtml = "";
+    if (mode === "double") {
+        contentHtml = `
+            ${buildSingleInvoiceHtml(sale, "1ª Via — Cliente", true)}
+            <div class="inv-cut-divider"><span>✂ Corte Aqui • 2ª Via Controle da Granja</span></div>
+            ${buildSingleInvoiceHtml(sale, "2ª Via — Controle da Granja", true)}
+        `;
+    } else {
+        contentHtml = buildSingleInvoiceHtml(sale, "Via do Cliente", false);
+    }
+
+    const wrapper = document.createElement("div");
+    wrapper.style.cssText = "position:fixed; left:-10000px; top:0; width:794px; background:#ffffff; z-index:-9999;";
+    wrapper.innerHTML = `
+        <style>
+            ${getInvoiceStyles(mode, true)}
+            .pdf-render-sheet {
+                background: #ffffff;
+                width: 794px;
+                padding: ${mode === "double" ? "24px 30px" : "36px 42px"};
+                box-sizing: border-box;
+            }
+        </style>
+        <div class="pdf-render-sheet">${contentHtml}</div>
+    `;
+    document.body.appendChild(wrapper);
+
+    try {
+        const imgs = Array.from(wrapper.querySelectorAll("img"));
+        await Promise.all(imgs.map(img => {
+            if (img.complete) return Promise.resolve();
+            return new Promise(res => {
+                img.onload = res;
+                img.onerror = res;
+            });
+        }));
+
+        const targetEl = wrapper.querySelector(".pdf-render-sheet");
+        const opt = {
+            margin: [8, 8, 8, 8],
+            filename: fileName,
+            image: { type: "jpeg", quality: 0.98 },
+            html2canvas: {
+                scale: 2,
+                useCORS: true,
+                allowTaint: true,
+                backgroundColor: "#ffffff",
+                windowWidth: 794
+            },
+            jsPDF: { unit: "mm", format: "a4", orientation: "portrait" }
+        };
+
+        const worker = html2pdf().set(opt).from(targetEl);
+        const pdfBlob = await worker.outputPdf("blob");
+        const pdfFile = new File([pdfBlob], fileName, { type: "application/pdf" });
+        return { pdfBlob, pdfFile, fileName };
+    } finally {
+        wrapper.remove();
+    }
+}
+
+function buildPublicReceiptPdfLink(sale, emp, clienteCad, produtoCad) {
+    try {
+        const compactPayload = {
+            s: {
+                id: sale.id,
+                d: sale.data || sale.data_transacao || getTodayISO(),
+                dp: sale.dataPagamento || "",
+                c: sale.cliente || "Consumidor Geral",
+                p: sale.produto || "Ovos / Produto da Granja",
+                q: Number(sale.qtd ?? sale.quantidade) || 1,
+                u: sale.unidade || "un",
+                vu: Number(sale.valorUnitario ?? sale.valor_unitario) || 0,
+                dc: Number(sale.desconto) || 0,
+                vt: Number(sale.valor ?? sale.valor_total) || 0,
+                st: sale.status || "pago",
+                ob: sale.descricao || ""
+            },
+            e: {
+                n: emp.nome || DEFAULT_EMPRESA.nome,
+                sb: emp.subtitulo || "",
+                dc: emp.documento || "",
+                r: emp.responsavel || "",
+                t: emp.telefone || "",
+                em: emp.email || "",
+                en: emp.endereco || "",
+                px: emp.chavePix || "",
+                fp: emp.favorecidoPix || "",
+                rd: emp.mensagemRodape || ""
+            },
+            cl: {
+                t: clienteCad?.telefone || "",
+                cd: clienteCad?.cidade || ""
+            },
+            pr: {
+                to: produtoCad?.tipoOvo || "",
+                ov: Number(produtoCad?.ovosPorItem) || 0
+            }
+        };
+        const jsonStr = JSON.stringify(compactPayload);
+        const b64 = btoa(unescape(encodeURIComponent(jsonStr)));
+        const baseUrl = `${window.location.origin}${window.location.pathname}`;
+        return `${baseUrl}?recibo=${encodeURIComponent(b64)}`;
+    } catch (e) {
+        return "";
+    }
+}
+
+function triggerBlobDownload(blob, fileName) {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
+}
+
+export async function sendSaleReceiptWhatsApp() {
     const sale = state.db.historico.find(h => Number(h.id) === Number(currentReceiptSaleId));
     if (!sale) return toast("Selecione uma venda para enviar o recibo.");
 
@@ -931,89 +1073,203 @@ export function sendSaleReceiptWhatsApp() {
              String(c.nome || "").trim().toLowerCase() === String(clienteNome).trim().toLowerCase()
     );
 
-    let rawPhone = clienteCad?.telefone || "";
-    let phoneDDI = normalizeWhatsappNumber(rawPhone);
-
-    if (!phoneDDI) {
-        const informado = prompt(
-            `O cliente "${clienteNome}" não possui WhatsApp válido cadastrado.\n\nInforme o número com DDD (ex: 82999999999):`,
-            rawPhone || ""
-        );
-        if (informado === null) return;
-        phoneDDI = normalizeWhatsappNumber(informado);
-        if (!phoneDDI) {
-            return toast("Número de WhatsApp inválido. Informe o DDD + número.");
-        }
-    }
-
     const produtoNome = sale.produto || "Ovos / Produto da Granja";
     const produtoCad = (db.produtos || []).find(
         p => String(p.id) === String(sale.produto_id) ||
              String(p.nome || "").trim().toLowerCase() === String(produtoNome).trim().toLowerCase()
     );
 
-    const qtd = Number(sale.qtd ?? sale.quantidade) || 1;
-    const valorUnitario = Number(sale.valorUnitario ?? sale.valor_unitario) || (qtd > 0 ? (Number(sale.valor) || 0) / qtd : 0);
-    const subtotalBruto = qtd * valorUnitario;
-    const desconto = Number(sale.desconto) || 0;
-    const valorTotal = Number(sale.valor ?? sale.valor_total) || Math.max(0, subtotalBruto - desconto);
-
-    const ovosPorUn = Number(produtoCad?.ovosPorItem) || 0;
-    const totalOvosVenda = ovosPorUn > 0 ? ovosPorUn * qtd : 0;
-
-    const statusAtual = String(sale.status || "pago").toLowerCase();
-    const isPago = statusAtual === "pago";
-    const dataVendaBR = formatarDataBR(sale.data || sale.data_transacao || getTodayISO());
-    const dataPagBR = sale.dataPagamento ? formatarDataBR(sale.dataPagamento) : (isPago ? dataVendaBR : "");
-    const numRecibo = String(sale.id || "").slice(-6).padStart(6, "0");
-
-    const linhas = [];
-    linhas.push(`🥚 *${(emp.nome || DEFAULT_EMPRESA.nome).toUpperCase()}*`);
-    if (emp.subtitulo) linhas.push(`_${emp.subtitulo}_`);
-    if (emp.documento) {
-        const digitosDoc = String(emp.documento).replace(/\D/g, "");
-        const rotuloDoc = digitosDoc.length > 11 ? "CNPJ" : "CPF";
-        linhas.push(`${rotuloDoc}: ${formatarCpfCnpj(emp.documento)}`);
+    const btnZap = document.getElementById("btnSendReceiptWhatsapp");
+    const originalBtnHtml = btnZap ? btnZap.innerHTML : "";
+    if (btnZap) {
+        btnZap.disabled = true;
+        btnZap.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Gerando PDF...`;
     }
-    if (emp.telefone) linhas.push(`Tel: ${emp.telefone}`);
-    linhas.push(`--------------------------------`);
-    linhas.push(`🧾 *RECIBO DE VENDA Nº ${numRecibo}*`);
-    linhas.push(`📅 *Data:* ${dataVendaBR}`);
-    linhas.push(`👤 *Cliente:* ${clienteNome}`);
-    if (clienteCad?.cidade) linhas.push(`📍 *Cidade:* ${clienteCad.cidade}`);
-    linhas.push(`--------------------------------`);
-    linhas.push(`📦 *Produto:* ${produtoNome}`);
-    linhas.push(`🔢 *Quantidade:* ${formatNumber(qtd)} ${sale.unidade || "un"}${totalOvosVenda > 0 ? ` (${totalOvosVenda.toLocaleString("pt-BR")} ovos)` : ""}`);
-    linhas.push(`💲 *Valor Unit.:* ${money(valorUnitario)}`);
-    if (desconto > 0) {
-        linhas.push(`Subtotal: ${money(subtotalBruto)}`);
-        linhas.push(`Desconto: - ${money(desconto)}`);
-    }
-    linhas.push(`💰 *VALOR TOTAL: ${money(valorTotal)}*`);
-    linhas.push(`--------------------------------`);
-    if (isPago) {
-        linhas.push(`✅ *Situação:* PAGO / QUITADO${dataPagBR ? ` (${dataPagBR})` : ""}`);
-    } else {
-        linhas.push(`⏳ *Situação:* PENDENTE DE PAGAMENTO`);
-    }
-    if (sale.descricao) {
-        linhas.push(`📝 *Obs:* ${sale.descricao}`);
-    }
-    if (emp.chavePix && (!isPago || emp.chavePix)) {
-        const favorecido = emp.favorecidoPix || emp.responsavel || emp.nome || DEFAULT_EMPRESA.nome;
-        linhas.push(`--------------------------------`);
-        linhas.push(`💠 *Dados PIX:*`);
-        linhas.push(`Chave: *${emp.chavePix}*`);
-        linhas.push(`Favorecido: ${favorecido}`);
-    }
-    linhas.push(`--------------------------------`);
-    linhas.push(`_${emp.mensagemRodape || DEFAULT_EMPRESA.mensagemRodape}_`);
 
-    const textoFinal = linhas.join("\n");
-    const whatsappUrl = `https://wa.me/${phoneDDI}?text=${encodeURIComponent(textoFinal)}`;
+    try {
+        const mode = document.getElementById("receiptCopyMode")?.value || "single";
+        const { pdfBlob, pdfFile, fileName } = await generateReceiptPdfFile(sale, mode);
 
-    window.open(whatsappUrl, "_blank", "noopener,noreferrer");
-    toast(`Abrindo WhatsApp de ${clienteNome}...`);
+        const qtd = Number(sale.qtd ?? sale.quantidade) || 1;
+        const valorUnitario = Number(sale.valorUnitario ?? sale.valor_unitario) || (qtd > 0 ? (Number(sale.valor) || 0) / qtd : 0);
+        const subtotalBruto = qtd * valorUnitario;
+        const desconto = Number(sale.desconto) || 0;
+        const valorTotal = Number(sale.valor ?? sale.valor_total) || Math.max(0, subtotalBruto - desconto);
+        const numRecibo = String(sale.id || "").slice(-6).padStart(6, "0");
+
+        // 1) Em celulares/dispositivos móveis que suportam envio direto do arquivo PDF via Web Share API:
+        const isMobileDevice = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent || "");
+        if (isMobileDevice && navigator.canShare && navigator.canShare({ files: [pdfFile] })) {
+            const shareCaption = `Recibo Nº ${numRecibo} - ${emp.nome || DEFAULT_EMPRESA.nome}\nCliente: ${clienteNome}${clienteCad?.telefone ? ` (${clienteCad.telefone})` : ""}\nTotal: ${money(valorTotal)}`;
+            await navigator.share({
+                files: [pdfFile],
+                title: fileName,
+                text: shareCaption
+            });
+            toast("PDF do recibo compartilhado com sucesso!");
+            return;
+        }
+
+        // 2) No computador (ou navegadores sem compartilhamento nativo de arquivo para WhatsApp):
+        // Valida o número do cliente, baixa o arquivo PDF automaticamente e abre a conversa do cliente com o link direto do PDF
+        let rawPhone = clienteCad?.telefone || "";
+        let phoneDDI = normalizeWhatsappNumber(rawPhone);
+
+        if (!phoneDDI) {
+            const informado = prompt(
+                `O cliente "${clienteNome}" não possui WhatsApp válido cadastrado.\n\nInforme o número com DDD (ex: 82999999999):`,
+                rawPhone || ""
+            );
+            if (informado === null) return;
+            phoneDDI = normalizeWhatsappNumber(informado);
+            if (!phoneDDI) {
+                return toast("Número de WhatsApp inválido. Informe o DDD + número.");
+            }
+        }
+
+        // Baixa o arquivo PDF real no dispositivo para anexar na conversa aberta
+        triggerBlobDownload(pdfBlob, fileName);
+
+        const linkPdfOnline = buildPublicReceiptPdfLink(sale, emp, clienteCad, produtoCad);
+        const statusAtual = String(sale.status || "pago").toLowerCase();
+        const isPago = statusAtual === "pago";
+        const dataVendaBR = formatarDataBR(sale.data || sale.data_transacao || getTodayISO());
+
+        const linhas = [];
+        linhas.push(`🥚 *${(emp.nome || DEFAULT_EMPRESA.nome).toUpperCase()}*`);
+        linhas.push(`🧾 *RECIBO DE VENDA Nº ${numRecibo}*`);
+        linhas.push(`📅 *Data:* ${dataVendaBR}`);
+        linhas.push(`👤 *Cliente:* ${clienteNome}`);
+        linhas.push(`📦 *Produto:* ${produtoNome} (${formatNumber(qtd)} ${sale.unidade || "un"})`);
+        linhas.push(`💰 *VALOR TOTAL: ${money(valorTotal)}* (${isPago ? "PAGO" : "PENDENTE"})`);
+        if (linkPdfOnline) {
+            linhas.push(`--------------------------------`);
+            linhas.push(`📄 *Clique abaixo para abrir e baixar seu Recibo em PDF:*`);
+            linhas.push(linkPdfOnline);
+        }
+
+        const whatsappUrl = `https://wa.me/${phoneDDI}?text=${encodeURIComponent(linhas.join("\n"))}`;
+        window.open(whatsappUrl, "_blank", "noopener,noreferrer");
+        toast(`PDF "${fileName}" baixado! Anexe-o na conversa do WhatsApp de ${clienteNome} (ou envie o link do PDF já preenchido).`);
+    } catch (err) {
+        if (err && err.name === "AbortError") return;
+        console.error("Erro ao gerar/enviar PDF do recibo:", err);
+        toast("Erro ao gerar PDF do recibo: " + (err?.message || "tente novamente"));
+    } finally {
+        if (btnZap) {
+            btnZap.disabled = false;
+            btnZap.innerHTML = originalBtnHtml;
+        }
+    }
+}
+
+export async function checkPublicReceiptView() {
+    const params = new URLSearchParams(window.location.search);
+    const encoded = params.get("recibo");
+    if (!encoded) return false;
+
+    try {
+        const jsonStr = decodeURIComponent(escape(atob(encoded)));
+        const data = JSON.parse(jsonStr);
+        if (!data || !data.s) return false;
+
+        const sale = {
+            id: data.s.id,
+            data: data.s.d,
+            dataPagamento: data.s.dp,
+            cliente: data.s.c,
+            produto: data.s.p,
+            qtd: data.s.q,
+            unidade: data.s.u,
+            valorUnitario: data.s.vu,
+            desconto: data.s.dc,
+            valor: data.s.vt,
+            status: data.s.st,
+            descricao: data.s.ob
+        };
+
+        if (!state.db.config) state.db.config = {};
+        state.db.config.empresa = normalizeEmpresa({
+            nome: data.e?.n,
+            subtitulo: data.e?.sb,
+            documento: data.e?.dc,
+            responsavel: data.e?.r,
+            telefone: data.e?.t,
+            email: data.e?.em,
+            endereco: data.e?.en,
+            chavePix: data.e?.px,
+            favorecidoPix: data.e?.fp,
+            mensagemRodape: data.e?.rd
+        });
+
+        state.db.clientes = [{
+            id: 1,
+            nome: sale.cliente,
+            telefone: data.cl?.t || "",
+            cidade: data.cl?.cd || ""
+        }];
+        state.db.produtos = [{
+            id: 1,
+            nome: sale.produto,
+            tipoOvo: data.pr?.to || "",
+            ovosPorItem: data.pr?.ov || 0
+        }];
+
+        const authScreen = document.getElementById("auth-screen");
+        const appContent = document.getElementById("app-content");
+        if (authScreen) authScreen.style.display = "none";
+        if (appContent) appContent.style.display = "none";
+
+        const numRecibo = String(sale.id || "").slice(-6).padStart(6, "0");
+        const publicView = document.createElement("div");
+        publicView.style.cssText = "min-height:100vh; background:#eef2f6; padding:16px; display:flex; flex-direction:column; align-items:center; gap:14px;";
+        publicView.innerHTML = `
+            <div style="width:100%; max-width:210mm; background:#fff; padding:12px 16px; border-radius:12px; box-shadow:0 4px 14px rgba(0,0,0,0.08); display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+                <div style="font-weight:800; color:#132a1c; font-size:0.95rem;">
+                    <i class="fas fa-file-pdf" style="color:#dc2626;"></i> Recibo Nº ${esc(numRecibo)} — ${esc(sale.cliente)}
+                </div>
+                <div style="display:flex; gap:8px;">
+                    <button type="button" id="btnPublicDownloadPdf" class="btn primary small">
+                        <i class="fas fa-download"></i> Baixar PDF
+                    </button>
+                    <button type="button" id="btnPublicPrintPdf" class="btn ghost small">
+                        <i class="fas fa-print"></i> Imprimir
+                    </button>
+                </div>
+            </div>
+            <style>${getInvoiceStyles("single", false)}</style>
+            <div class="a4-page-sheet">
+                ${buildSingleInvoiceHtml(sale, "Via do Cliente", false)}
+            </div>
+        `;
+        document.body.appendChild(publicView);
+
+        const downloadFn = async () => {
+            const btn = document.getElementById("btnPublicDownloadPdf");
+            if (btn) {
+                btn.disabled = true;
+                btn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Gerando PDF...`;
+            }
+            try {
+                const { pdfBlob, fileName } = await generateReceiptPdfFile(sale, "single");
+                triggerBlobDownload(pdfBlob, fileName);
+            } finally {
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerHTML = `<i class="fas fa-download"></i> Baixar PDF`;
+                }
+            }
+        };
+
+        document.getElementById("btnPublicDownloadPdf")?.addEventListener("click", downloadFn);
+        document.getElementById("btnPublicPrintPdf")?.addEventListener("click", () => window.print());
+
+        setTimeout(downloadFn, 500);
+        return true;
+    } catch (e) {
+        console.error("Erro ao abrir recibo público:", e);
+        return false;
+    }
 }
 
 export function printSaleReceipt() {

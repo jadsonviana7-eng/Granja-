@@ -104,7 +104,8 @@ import {
     closeReceiptModal,
     renderReceiptPreview,
     printSaleReceipt,
-    sendSaleReceiptWhatsApp
+    sendSaleReceiptWhatsApp,
+    checkPublicReceiptView
 } from './ui/reports.js';
 import {
     buildTabs,
@@ -260,6 +261,9 @@ Object.assign(window, {
 });
 
 async function init() {
+    const isPublicReceipt = await checkPublicReceiptView();
+    if (isPublicReceipt) return;
+
     checkAuthState();
     buildTabs();
     decorateCardHeaders();
