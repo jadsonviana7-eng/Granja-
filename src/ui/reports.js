@@ -6,6 +6,8 @@ import { dateToISO, formatarDataBR, esc, money, formatNumber, getTodayISO, forma
 import { toast } from '../utils/icons.js';
 
 let currentReceiptSaleId = null;
+let cachedReceiptPdf = null;
+let receiptPdfBuildToken = 0;
 
 export function getEmpresaConfig() {
     const emp = normalizeEmpresa(state.db?.config?.empresa);
@@ -894,14 +896,43 @@ export function renderReceiptPreview() {
              String(c.nome || "").trim().toLowerCase() === String(clienteNome).trim().toLowerCase()
     );
     const btnZap = document.getElementById("btnSendReceiptWhatsapp");
-    const lblZap = document.getElementById("btnWhatsappLabel");
     if (btnZap) {
         if (clienteCad?.telefone) {
             btnZap.title = `Gerar PDF e enviar para ${clienteNome} (${clienteCad.telefone})`;
-            if (lblZap) lblZap.textContent = "Enviar PDF";
         } else {
             btnZap.title = `Gerar PDF e enviar via WhatsApp`;
-            if (lblZap) lblZap.textContent = "Enviar PDF";
+        }
+    }
+
+    // Pré-gera o PDF em segundo plano assim que o modal abre para que o toque em "Enviar PDF"
+    // chame navigator.share() de forma 100% síncrona (preservando o user gesture no Android/iOS)
+    prepareReceiptPdfCache(sale, mode);
+}
+
+async function prepareReceiptPdfCache(sale, mode) {
+    const token = ++receiptPdfBuildToken;
+    cachedReceiptPdf = null;
+
+    const btnZap = document.getElementById("btnSendReceiptWhatsapp");
+    if (btnZap) {
+        btnZap.disabled = true;
+        btnZap.innerHTML = `<i class="fas fa-spinner fa-spin"></i> <span id="btnWhatsappLabel">Preparando PDF...</span>`;
+    }
+
+    try {
+        const result = await generateReceiptPdfFile(sale, mode);
+        if (token !== receiptPdfBuildToken) return;
+        cachedReceiptPdf = {
+            saleId: Number(sale.id),
+            mode,
+            ...result
+        };
+    } catch (err) {
+        console.warn("Aviso ao pré-gerar PDF:", err);
+    } finally {
+        if (token === receiptPdfBuildToken && btnZap) {
+            btnZap.disabled = false;
+            btnZap.innerHTML = `<i class="fab fa-whatsapp" style="font-size: 1.05rem;"></i> <span id="btnWhatsappLabel">Enviar PDF</span>`;
         }
     }
 }
@@ -1116,6 +1147,7 @@ export async function sendSaleReceiptWhatsApp() {
 
     const emp = getEmpresaConfig();
     const { db } = state;
+    const mode = document.getElementById("receiptCopyMode")?.value || "single";
 
     const clienteNome = sale.cliente || "Consumidor Geral";
     const clienteCad = (db.clientes || []).find(
@@ -1129,39 +1161,56 @@ export async function sendSaleReceiptWhatsApp() {
              String(p.nome || "").trim().toLowerCase() === String(produtoNome).trim().toLowerCase()
     );
 
+    const qtd = Number(sale.qtd ?? sale.quantidade) || 1;
+    const valorUnitario = Number(sale.valorUnitario ?? sale.valor_unitario) || (qtd > 0 ? (Number(sale.valor) || 0) / qtd : 0);
+    const subtotalBruto = qtd * valorUnitario;
+    const desconto = Number(sale.desconto) || 0;
+    const valorTotal = Number(sale.valor ?? sale.valor_total) || Math.max(0, subtotalBruto - desconto);
+    const numRecibo = String(sale.id || "").slice(-6).padStart(6, "0");
+
+    // 1) Se o PDF já está pré-carregado no cache, chama navigator.share() IMEDIATAMENTE (sem nenhum await antes!)
+    // para que o Android/iOS reconheça o toque direto do usuário (user gesture).
+    const isMobileDevice = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent || "");
+    const hasReadyCache = cachedReceiptPdf && cachedReceiptPdf.saleId === Number(sale.id) && cachedReceiptPdf.mode === mode;
+
+    if (isMobileDevice && hasReadyCache && navigator.canShare && navigator.canShare({ files: [cachedReceiptPdf.pdfFile] })) {
+        try {
+            const shareCaption = `Recibo Nº ${numRecibo} - ${emp.nome || DEFAULT_EMPRESA.nome}\nCliente: ${clienteNome}${clienteCad?.telefone ? ` (${clienteCad.telefone})` : ""}\nTotal: ${money(valorTotal)}`;
+            await navigator.share({
+                files: [cachedReceiptPdf.pdfFile],
+                title: cachedReceiptPdf.fileName,
+                text: shareCaption
+            });
+            toast("PDF do recibo compartilhado com sucesso!");
+            return;
+        } catch (err) {
+            if (err && err.name === "AbortError") return;
+            console.warn("Aviso no compartilhamento nativo:", err);
+        }
+    }
+
     const btnZap = document.getElementById("btnSendReceiptWhatsapp");
-    const originalBtnHtml = btnZap ? btnZap.innerHTML : "";
+    const originalBtnHtml = `<i class="fab fa-whatsapp" style="font-size: 1.05rem;"></i> <span id="btnWhatsappLabel">Enviar PDF</span>`;
     if (btnZap) {
         btnZap.disabled = true;
         btnZap.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Gerando PDF...`;
     }
 
     try {
-        const mode = document.getElementById("receiptCopyMode")?.value || "single";
-        const { pdfBlob, pdfFile, fileName } = await generateReceiptPdfFile(sale, mode);
+        const pdfData = hasReadyCache ? cachedReceiptPdf : await generateReceiptPdfFile(sale, mode);
+        cachedReceiptPdf = {
+            saleId: Number(sale.id),
+            mode,
+            ...pdfData
+        };
 
-        const qtd = Number(sale.qtd ?? sale.quantidade) || 1;
-        const valorUnitario = Number(sale.valorUnitario ?? sale.valor_unitario) || (qtd > 0 ? (Number(sale.valor) || 0) / qtd : 0);
-        const subtotalBruto = qtd * valorUnitario;
-        const desconto = Number(sale.desconto) || 0;
-        const valorTotal = Number(sale.valor ?? sale.valor_total) || Math.max(0, subtotalBruto - desconto);
-        const numRecibo = String(sale.id || "").slice(-6).padStart(6, "0");
-
-        // 1) Em celulares/dispositivos móveis que suportam envio direto do arquivo PDF via Web Share API:
-        const isMobileDevice = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent || "");
-        if (isMobileDevice && navigator.canShare && navigator.canShare({ files: [pdfFile] })) {
-            const shareCaption = `Recibo Nº ${numRecibo} - ${emp.nome || DEFAULT_EMPRESA.nome}\nCliente: ${clienteNome}${clienteCad?.telefone ? ` (${clienteCad.telefone})` : ""}\nTotal: ${money(valorTotal)}`;
-            await navigator.share({
-                files: [pdfFile],
-                title: fileName,
-                text: shareCaption
-            });
-            toast("PDF do recibo compartilhado com sucesso!");
+        // Caso estivesse no celular mas o cache ainda não estivesse pronto no primeiro clique:
+        if (isMobileDevice && navigator.canShare && navigator.canShare({ files: [pdfData.pdfFile] })) {
+            toast("PDF pronto! Toque novamente em 'Enviar PDF' para abrir o WhatsApp.");
             return;
         }
 
-        // 2) No computador (ou navegadores sem compartilhamento nativo de arquivo para WhatsApp):
-        // Valida o número do cliente, baixa o arquivo PDF automaticamente e abre a conversa do cliente com o link direto do PDF
+        // 2) No computador (ou navegadores sem compartilhamento nativo de arquivo):
         let rawPhone = clienteCad?.telefone || "";
         let phoneDDI = normalizeWhatsappNumber(rawPhone);
 
@@ -1177,8 +1226,7 @@ export async function sendSaleReceiptWhatsApp() {
             }
         }
 
-        // Baixa o arquivo PDF real no dispositivo para anexar na conversa aberta
-        triggerBlobDownload(pdfBlob, fileName);
+        triggerBlobDownload(pdfData.pdfBlob, pdfData.fileName);
 
         const linkPdfOnline = buildPublicReceiptPdfLink(sale, emp, clienteCad, produtoCad);
         const statusAtual = String(sale.status || "pago").toLowerCase();
@@ -1200,7 +1248,7 @@ export async function sendSaleReceiptWhatsApp() {
 
         const whatsappUrl = `https://wa.me/${phoneDDI}?text=${encodeURIComponent(linhas.join("\n"))}`;
         window.open(whatsappUrl, "_blank", "noopener,noreferrer");
-        toast(`PDF "${fileName}" baixado! Anexe-o na conversa do WhatsApp de ${clienteNome} (ou envie o link do PDF já preenchido).`);
+        toast(`PDF "${pdfData.fileName}" baixado! Anexe-o na conversa do WhatsApp de ${clienteNome}.`);
     } catch (err) {
         if (err && err.name === "AbortError") return;
         console.error("Erro ao gerar/enviar PDF do recibo:", err);
