@@ -26,7 +26,8 @@
     <link rel="stylesheet" href="./src/styles/layout.css">
     <link rel="stylesheet" href="./src/styles/components.css">
     <link rel="stylesheet" href="./src/styles/pages.css">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js" defer></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js" defer></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" defer></script>
     <script type="importmap">
     {
         "imports": {
@@ -55,8 +56,8 @@
 </head>
 
 <body>
-    <!-- Tela de Autenticação -->
-    <div id="auth-screen" class="auth-overlay">
+    <!-- Tela de Autenticação (oculta por padrão para evitar flash antes de validar a sessão) -->
+    <div id="auth-screen" class="auth-overlay" style="display: none;">
         <div class="auth-card card">
             <div class="auth-header">
                 <img src="logo.png" alt="Logo Granja" class="auth-logo">
@@ -123,6 +124,33 @@
     </div>
 
     <main class="app-shell" id="app-content" style="display: none;">
+    <script>
+        (function () {
+            try {
+                if (window.location.search.indexOf("recibo=") !== -1) return;
+                var hasSession = false;
+                for (var i = 0; i < localStorage.length; i++) {
+                    var k = localStorage.key(i);
+                    if (k && k.indexOf("sb-") === 0 && k.indexOf("-auth-token") !== -1) {
+                        var raw = localStorage.getItem(k);
+                        if (raw && raw.indexOf("access_token") !== -1) {
+                            hasSession = true;
+                            break;
+                        }
+                    }
+                }
+                var authEl = document.getElementById("auth-screen");
+                var appEl = document.getElementById("app-content");
+                if (hasSession) {
+                    if (authEl) authEl.style.display = "none";
+                    if (appEl) appEl.style.display = "block";
+                } else {
+                    if (authEl) authEl.style.display = "flex";
+                    if (appEl) appEl.style.display = "none";
+                }
+            } catch (e) {}
+        })();
+    </script>
         <header class="topbar">
             <div class="brand-wrapper" onclick="showPage('page-visao-geral')">
                 <div class="logo-container"><img src="logo.png" alt="Logo Granja"></div>

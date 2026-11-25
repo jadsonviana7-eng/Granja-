@@ -71,6 +71,8 @@ export function closeLogoutModal() {
     if (modal) modal.style.display = 'none';
 }
 
+const USER_PROFILE_CACHE_KEY = "granjaViana_cached_user_profile";
+
 export async function confirmLogout() {
     closeLogoutModal();
     await registrarLog({
@@ -79,6 +81,7 @@ export async function confirmLogout() {
         resumo: `Logout realizado pelo usuário`,
         detalhes: { email: state.currentUser?.email || "" }
     });
+    localStorage.removeItem(USER_PROFILE_CACHE_KEY);
     await supabaseClient.auth.signOut();
     location.reload();
 }
@@ -379,20 +382,46 @@ export function applyRolePolicies(role) {
 }
 
 export async function checkAuthState() {
-    const { data: { user } } = await supabaseClient.auth.getUser();
     const authScreen = document.getElementById('auth-screen');
     const appContent = document.getElementById('app-content');
+
+    // 1) Verifica a sessão local instantaneamente (sem aguardar requisição de rede)
+    const { data: sessionData } = await supabaseClient.auth.getSession();
+    let user = sessionData?.session?.user || null;
+
+    if (!user) {
+        // Fallback: caso não haja sessão local imediata, confirma via getUser()
+        const { data: userData } = await supabaseClient.auth.getUser();
+        user = userData?.user || null;
+    }
 
     if (user) {
         state.currentUser = user;
         if (authScreen) authScreen.style.display = 'none';
         if (appContent) appContent.style.display = 'block';
 
-        let name = user.user_metadata?.full_name || user.email;
-        let role = user.user_metadata?.role || 'common';
-        let photo = user.user_metadata?.avatar_url || DEFAULT_AVATAR;
+        let cachedProfile = null;
+        try {
+            const rawCache = localStorage.getItem(USER_PROFILE_CACHE_KEY);
+            if (rawCache) {
+                const parsed = JSON.parse(rawCache);
+                if (parsed && parsed.id === user.id) cachedProfile = parsed;
+            }
+        } catch (_) {}
 
-        // Consulta o perfil atualizado na tabela `usuarios` do Supabase (prioridade sobre user_metadata)
+        let name = cachedProfile?.name || user.user_metadata?.full_name || user.email;
+        let role = cachedProfile?.role || user.user_metadata?.role || 'common';
+        let photo = cachedProfile?.photo || user.user_metadata?.avatar_url || DEFAULT_AVATAR;
+
+        const photoEl = document.getElementById('user-display-photo');
+        if (photoEl) photoEl.src = photo;
+
+        const dropName = document.getElementById('dropdown-name');
+        if (dropName) dropName.textContent = name;
+
+        applyRolePolicies(role);
+
+        // 2) Atualiza dados do perfil e banco em segundo plano sem bloquear a interface
         try {
             const { data: dbUser } = await supabaseClient
                 .from('usuarios')
@@ -409,11 +438,11 @@ export async function checkAuthState() {
             console.warn("Não foi possível consultar perfil em usuarios:", err);
         }
 
-        const photoEl = document.getElementById('user-display-photo');
         if (photoEl) photoEl.src = photo;
-
-        const dropName = document.getElementById('dropdown-name');
         if (dropName) dropName.textContent = name;
+        try {
+            localStorage.setItem(USER_PROFILE_CACHE_KEY, JSON.stringify({ id: user.id, name, role, photo }));
+        } catch (_) {}
 
         applyRolePolicies(role);
         await loadFromSupabase();
@@ -422,8 +451,12 @@ export async function checkAuthState() {
         const syncedUser = (state.db?.usuarios || []).find(u => u.id === user.id);
         if (syncedUser?.role && syncedUser.role !== role) {
             applyRolePolicies(syncedUser.role);
+            try {
+                localStorage.setItem(USER_PROFILE_CACHE_KEY, JSON.stringify({ id: user.id, name, role: syncedUser.role, photo }));
+            } catch (_) {}
         }
     } else {
+        localStorage.removeItem(USER_PROFILE_CACHE_KEY);
         if (authScreen) authScreen.style.display = 'flex';
         if (appContent) appContent.style.display = 'none';
     }

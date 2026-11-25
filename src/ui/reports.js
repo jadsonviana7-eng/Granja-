@@ -918,21 +918,33 @@ function normalizeWhatsappNumber(rawPhone) {
     return digits.length >= 10 ? digits : "";
 }
 
-function ensureHtml2PdfLoaded() {
-    if (typeof window.html2pdf === "function") {
-        return Promise.resolve(window.html2pdf);
-    }
+function loadExternalScript(src) {
     return new Promise((resolve, reject) => {
+        const existing = document.querySelector(`script[src="${src}"]`);
+        if (existing) {
+            existing.addEventListener("load", () => resolve());
+            existing.addEventListener("error", () => reject(new Error(`Falha ao carregar ${src}`)));
+            return;
+        }
         const script = document.createElement("script");
-        script.src = "https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js";
-        script.onload = () => resolve(window.html2pdf);
-        script.onerror = () => reject(new Error("Falha ao carregar gerador de PDF"));
+        script.src = src;
+        script.onload = () => resolve();
+        script.onerror = () => reject(new Error(`Falha ao carregar ${src}`));
         document.head.appendChild(script);
     });
 }
 
+async function ensurePdfLibsLoaded() {
+    if (typeof window.html2canvas !== "function") {
+        await loadExternalScript("https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js");
+    }
+    if (!window.jspdf?.jsPDF && typeof window.jsPDF !== "function") {
+        await loadExternalScript("https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js");
+    }
+}
+
 async function generateReceiptPdfFile(sale, mode = "single") {
-    const html2pdf = await ensureHtml2PdfLoaded();
+    await ensurePdfLibsLoaded();
     const numRecibo = String(sale.id || "").slice(-6).padStart(6, "0");
     const safeClient = String(sale.cliente || "Cliente")
         .normalize("NFD")
@@ -952,16 +964,22 @@ async function generateReceiptPdfFile(sale, mode = "single") {
         contentHtml = buildSingleInvoiceHtml(sale, "Via do Cliente", false);
     }
 
+    const renderPxWidth = 760;
     const wrapper = document.createElement("div");
-    wrapper.style.cssText = "position:fixed; left:-10000px; top:0; width:794px; background:#ffffff; z-index:-9999;";
+    wrapper.style.cssText = `position:fixed; left:0; top:0; width:${renderPxWidth}px; background:#ffffff; z-index:-9999; pointer-events:none; overflow:visible;`;
     wrapper.innerHTML = `
         <style>
             ${getInvoiceStyles(mode, true)}
             .pdf-render-sheet {
                 background: #ffffff;
-                width: 794px;
-                padding: ${mode === "double" ? "24px 30px" : "36px 42px"};
+                width: ${renderPxWidth}px;
+                max-width: ${renderPxWidth}px;
+                margin: 0;
+                padding: 16px 20px;
                 box-sizing: border-box;
+            }
+            .pdf-render-sheet .inv-doc-box {
+                min-width: 195px;
             }
         </style>
         <div class="pdf-render-sheet">${contentHtml}</div>
@@ -978,23 +996,55 @@ async function generateReceiptPdfFile(sale, mode = "single") {
             });
         }));
 
-        const targetEl = wrapper.querySelector(".pdf-render-sheet");
-        const opt = {
-            margin: [8, 8, 8, 8],
-            filename: fileName,
-            image: { type: "jpeg", quality: 0.98 },
-            html2canvas: {
-                scale: 2,
-                useCORS: true,
-                allowTaint: true,
-                backgroundColor: "#ffffff",
-                windowWidth: 794
-            },
-            jsPDF: { unit: "mm", format: "a4", orientation: "portrait" }
-        };
+        await new Promise(r => setTimeout(r, 60));
 
-        const worker = html2pdf().set(opt).from(targetEl);
-        const pdfBlob = await worker.outputPdf("blob");
+        const targetEl = wrapper.querySelector(".pdf-render-sheet");
+        const targetHeight = targetEl.scrollHeight || targetEl.offsetHeight || 900;
+
+        const canvas = await window.html2canvas(targetEl, {
+            scale: 2,
+            useCORS: true,
+            allowTaint: true,
+            backgroundColor: "#ffffff",
+            width: renderPxWidth,
+            height: targetHeight,
+            windowWidth: renderPxWidth,
+            windowHeight: targetHeight + 100,
+            x: 0,
+            y: 0,
+            scrollX: 0,
+            scrollY: 0
+        });
+
+        const JsPDF = window.jspdf?.jsPDF || window.jsPDF;
+        const pdf = new JsPDF({
+            orientation: "portrait",
+            unit: "mm",
+            format: "a4",
+            compress: true
+        });
+
+        const pageWidth = 210;
+        const pageHeight = 297;
+        const marginX = 12;
+        const marginTop = 12;
+        const maxContentWidth = pageWidth - (marginX * 2); // 186mm
+        const maxContentHeight = pageHeight - (marginTop * 2); // 273mm
+
+        let renderWidth = maxContentWidth;
+        let renderHeight = (canvas.height * renderWidth) / canvas.width;
+
+        if (renderHeight > maxContentHeight) {
+            const scaleFactor = maxContentHeight / renderHeight;
+            renderHeight = maxContentHeight;
+            renderWidth = renderWidth * scaleFactor;
+        }
+
+        const offsetX = (pageWidth - renderWidth) / 2;
+        const imgData = canvas.toDataURL("image/jpeg", 0.96);
+        pdf.addImage(imgData, "JPEG", offsetX, marginTop, renderWidth, renderHeight);
+
+        const pdfBlob = pdf.output("blob");
         const pdfFile = new File([pdfBlob], fileName, { type: "application/pdf" });
         return { pdfBlob, pdfFile, fileName };
     } finally {
