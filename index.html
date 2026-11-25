@@ -710,7 +710,80 @@
                                 placeholder="Ex: Agradecemos a preferência! Ovos selecionados direto da granja.">
                         </div>
 
-                        <div style="display: flex; justify-content: flex-end; margin-top: 8px;" class="admin-only">
+                        <div style="margin-top: 18px; padding: 16px; background: var(--surface-2); border: 1px solid var(--line); border-radius: 12px;">
+                            <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin-bottom: 10px;">
+                                <h3 style="margin: 0; font-size: 0.95rem; color: var(--ink); display: flex; align-items: center; gap: 8px;">
+                                    <i class="fab fa-whatsapp" style="color: #25d366; font-size: 1.15rem;"></i>
+                                    Integração WhatsApp API (Envio Automático de PDF)
+                                </h3>
+                                <span id="whatsappApiStatusBadge" class="badge green" style="display: none;">API Ativa</span>
+                            </div>
+                            <p class="hint-text" style="margin-bottom: 12px;">
+                                Com a API configurada, ao clicar em <strong>Enviar PDF</strong> no recibo, o sistema busca automaticamente o telefone cadastrado do cliente e envia o arquivo PDF + mensagem de agradecimento direto para o WhatsApp dele sem precisar selecionar o contato.
+                            </p>
+
+                            <div class="field">
+                                <label for="whatsappApiProvider">Provedor da API de WhatsApp</label>
+                                <select id="whatsappApiProvider" onchange="toggleWhatsappApiFields()">
+                                    <option value="proprio">⭐ Servidor Próprio Gratuito da Granja (QR Code integrado)</option>
+                                    <option value="">Desativado (Compartilhamento manual pelo aparelho)</option>
+                                    <option value="evolution">Evolution API (v1 / v2)</option>
+                                    <option value="zapi">Z-API</option>
+                                    <option value="ultramsg">UltraMsg</option>
+                                    <option value="waha">WAHA (WhatsApp HTTP API)</option>
+                                    <option value="webhook">Webhook / n8n / API Personalizada (POST JSON)</option>
+                                </select>
+                            </div>
+
+                            <div id="whatsappSelfHostedPanel" style="display: none; margin-bottom: 14px; padding: 14px; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 10px;">
+                                <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
+                                    <div>
+                                        <div style="font-size: 0.85rem; font-weight: 800; color: var(--ink);">Status do Servidor WhatsApp da Granja:</div>
+                                        <div id="whatsappSelfStatusText" style="font-size: 0.82rem; color: var(--muted); margin-top: 2px;">Verificando conexão...</div>
+                                    </div>
+                                    <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                                        <button type="button" class="btn ghost small" onclick="checkSelfHostedWhatsappStatus(true)">
+                                            <i class="fas fa-sync-alt"></i> Atualizar Status / QR
+                                        </button>
+                                        <button type="button" id="btnWhatsappSelfLogout" class="btn red small" onclick="logoutSelfHostedWhatsapp()" style="display: none;">
+                                            <i class="fas fa-unlink"></i> Desconectar
+                                        </button>
+                                    </div>
+                                </div>
+                                <div id="whatsappSelfQrBox" style="display: none; text-align: center; margin-top: 12px; padding-top: 12px; border-top: 1px dashed #cbd5e1;">
+                                    <p style="margin: 0 0 8px; font-size: 0.82rem; font-weight: 700; color: #132a1c;">
+                                        📱 Abra o WhatsApp da Granja no celular → Aparelhos Conectados → Conectar Aparelho e escaneie:
+                                    </p>
+                                    <img id="whatsappSelfQrImg" src="" alt="QR Code WhatsApp" style="width: 220px; height: 220px; border: 2px solid #1b7a43; border-radius: 12px; padding: 6px; background: #fff;">
+                                </div>
+                            </div>
+
+                            <div id="whatsappApiFieldsContainer" style="display: none;">
+                                <div class="grid-2">
+                                    <div class="field" id="fieldWhatsappApiUrl">
+                                        <label for="whatsappApiUrl" id="labelWhatsappApiUrl">URL da API</label>
+                                        <input id="whatsappApiUrl" type="url" placeholder="https://sua-api.com">
+                                    </div>
+                                    <div class="field" id="fieldWhatsappApiInstance">
+                                        <label for="whatsappApiInstance" id="labelWhatsappApiInstance">Instância (Nome ou ID)</label>
+                                        <input id="whatsappApiInstance" type="text" placeholder="Ex: granja_viana">
+                                    </div>
+                                </div>
+                                <div class="grid-2">
+                                    <div class="field" id="fieldWhatsappApiToken">
+                                        <label for="whatsappApiToken" id="labelWhatsappApiToken">Token / API Key</label>
+                                        <input id="whatsappApiToken" type="password" placeholder="Cole seu Token ou API Key">
+                                    </div>
+                                    <div class="field" id="fieldWhatsappApiClientToken" style="display: none;">
+                                        <label for="whatsappApiClientToken">Client-Token de Segurança (Z-API)</label>
+                                        <input id="whatsappApiClientToken" type="password" placeholder="Opcional (Client-Token do painel Z-API)">
+                                    </div>
+                                </div>
+                                <small id="whatsappApiHintText" style="display: block; color: var(--muted); font-size: 0.78rem; margin-top: 4px;"></small>
+                            </div>
+                        </div>
+
+                        <div style="display: flex; justify-content: flex-end; margin-top: 14px;" class="admin-only">
                             <button type="submit" id="btnSaveCompanyConfig" class="btn primary"
                                 style="width: auto; min-width: 220px;">
                                 <i class="fas fa-save"></i> Salvar Dados do Cabeçalho

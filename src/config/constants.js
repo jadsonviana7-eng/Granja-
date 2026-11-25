@@ -15,7 +15,12 @@ export const DEFAULT_EMPRESA = {
     endereco: "",
     chavePix: "",
     favorecidoPix: "",
-    mensagemRodape: "Obrigado pela preferência! Produtos frescos e selecionados direto da granja."
+    mensagemRodape: "Obrigado pela preferência! Produtos frescos e selecionados direto da granja.",
+    whatsappApiProvider: "proprio",
+    whatsappApiUrl: "http://localhost:3001",
+    whatsappApiInstance: "",
+    whatsappApiToken: "",
+    whatsappApiClientToken: ""
 };
 
 export const NOMES_MESES = [

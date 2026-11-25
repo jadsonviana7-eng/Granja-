@@ -8,6 +8,7 @@ import { toast } from '../utils/icons.js';
 let currentReceiptSaleId = null;
 let cachedReceiptPdf = null;
 let receiptPdfBuildToken = 0;
+let selfHostedStatusInterval = null;
 
 export function getEmpresaConfig() {
     const emp = normalizeEmpresa(state.db?.config?.empresa);
@@ -39,6 +40,168 @@ export function renderCompanyConfig() {
     setVal("companyPix", emp.chavePix || "");
     setVal("companyPixFavorecido", emp.favorecidoPix || "");
     setVal("companyFooter", emp.mensagemRodape || "");
+    setVal("whatsappApiProvider", emp.whatsappApiProvider || "proprio");
+    setVal("whatsappApiUrl", emp.whatsappApiUrl || "http://localhost:3001");
+    setVal("whatsappApiInstance", emp.whatsappApiInstance || "");
+    setVal("whatsappApiToken", emp.whatsappApiToken || "");
+    setVal("whatsappApiClientToken", emp.whatsappApiClientToken || "");
+    toggleWhatsappApiFields();
+}
+
+export async function checkSelfHostedWhatsappStatus(showFeedback = false) {
+    const provider = document.getElementById("whatsappApiProvider")?.value || "";
+    if (provider !== "proprio") return;
+
+    const baseUrl = (document.getElementById("whatsappApiUrl")?.value.trim() || "http://localhost:3001").replace(/\/+$/, "");
+    const statusText = document.getElementById("whatsappSelfStatusText");
+    const qrBox = document.getElementById("whatsappSelfQrBox");
+    const qrImg = document.getElementById("whatsappSelfQrImg");
+    const btnLogout = document.getElementById("btnWhatsappSelfLogout");
+    const badge = document.getElementById("whatsappApiStatusBadge");
+
+    try {
+        const res = await fetch(`${baseUrl}/status`, { method: "GET" });
+        const data = await res.json();
+
+        if (data.connected) {
+            if (statusText) {
+                statusText.innerHTML = `<span style="color: var(--green); font-weight: 800;">🟢 Conectado ao WhatsApp: ${esc(data.user?.name || "")} (${esc(data.user?.id || "")})</span>`;
+            }
+            if (qrBox) qrBox.style.display = "none";
+            if (btnLogout) btnLogout.style.display = "inline-flex";
+            if (badge) {
+                badge.textContent = "WhatsApp Conectado";
+                badge.className = "badge green";
+                badge.style.display = "inline-flex";
+            }
+            if (showFeedback) toast("WhatsApp conectado e pronto para enviar PDFs!");
+        } else if (data.qrDataUrl) {
+            if (statusText) {
+                statusText.innerHTML = `<span style="color: #b45309; font-weight: 700;">🟡 Aguardando leitura do QR Code abaixo...</span>`;
+            }
+            if (qrImg) qrImg.src = data.qrDataUrl;
+            if (qrBox) qrBox.style.display = "block";
+            if (btnLogout) btnLogout.style.display = "none";
+            if (badge) {
+                badge.textContent = "Aguardando QR Code";
+                badge.className = "badge amber";
+                badge.style.display = "inline-flex";
+            }
+        } else {
+            if (statusText) {
+                statusText.innerHTML = `<span style="color: #b45309; font-weight: 700;">⏳ Inicializando sessão do WhatsApp... aguarde alguns segundos.</span>`;
+            }
+            if (qrBox) qrBox.style.display = "none";
+            if (btnLogout) btnLogout.style.display = "none";
+        }
+    } catch (err) {
+        if (statusText) {
+            statusText.innerHTML = `<span style="color: var(--red); font-weight: 700;">🔴 Servidor local não detectado em ${esc(baseUrl)}. Inicie com <code>npm run whatsapp</code> ou <code>abrir-pwa.bat</code>.</span>`;
+        }
+        if (qrBox) qrBox.style.display = "none";
+        if (btnLogout) btnLogout.style.display = "none";
+        if (badge) {
+            badge.textContent = "Servidor Offline";
+            badge.className = "badge red";
+            badge.style.display = "inline-flex";
+        }
+        if (showFeedback) toast("Servidor WhatsApp offline. Inicie com 'npm run whatsapp'.");
+    }
+}
+
+export async function logoutSelfHostedWhatsapp() {
+    if (!confirm("Deseja desconectar o número atual do WhatsApp e gerar um novo QR Code?")) return;
+    const baseUrl = (document.getElementById("whatsappApiUrl")?.value.trim() || "http://localhost:3001").replace(/\/+$/, "");
+    try {
+        await fetch(`${baseUrl}/logout`, { method: "POST" });
+        toast("Sessão desconectada! Gerando novo QR Code...");
+        setTimeout(() => checkSelfHostedWhatsappStatus(false), 1800);
+    } catch (err) {
+        toast("Erro ao desconectar: " + err.message);
+    }
+}
+
+export function toggleWhatsappApiFields() {
+    const provider = document.getElementById("whatsappApiProvider")?.value || "";
+    const container = document.getElementById("whatsappApiFieldsContainer");
+    const selfPanel = document.getElementById("whatsappSelfHostedPanel");
+    const badge = document.getElementById("whatsappApiStatusBadge");
+    const urlField = document.getElementById("fieldWhatsappApiUrl");
+    const instField = document.getElementById("fieldWhatsappApiInstance");
+    const tokenField = document.getElementById("fieldWhatsappApiToken");
+    const clientTokenField = document.getElementById("fieldWhatsappApiClientToken");
+    const hint = document.getElementById("whatsappApiHintText");
+    const urlInput = document.getElementById("whatsappApiUrl");
+    const instInput = document.getElementById("whatsappApiInstance");
+
+    if (selfHostedStatusInterval) {
+        clearInterval(selfHostedStatusInterval);
+        selfHostedStatusInterval = null;
+    }
+
+    if (!container) return;
+
+    if (!provider) {
+        container.style.display = "none";
+        if (selfPanel) selfPanel.style.display = "none";
+        if (badge) badge.style.display = "none";
+        return;
+    }
+
+    container.style.display = "block";
+    if (badge) badge.style.display = "inline-flex";
+    if (tokenField) tokenField.style.display = "block";
+
+    if (provider === "proprio") {
+        if (selfPanel) selfPanel.style.display = "block";
+        if (urlField) urlField.style.display = "block";
+        if (instField) instField.style.display = "none";
+        if (tokenField) tokenField.style.display = "none";
+        if (clientTokenField) clientTokenField.style.display = "none";
+        if (urlInput && !urlInput.value) urlInput.value = "http://localhost:3001";
+        if (urlInput) urlInput.placeholder = "http://localhost:3001 (ou URL na nuvem)";
+        if (hint) hint.textContent = "Provedor Próprio Gratuito: Escaneie o QR Code acima uma única vez. Todos os recibos em PDF serão enviados diretamente para o telefone cadastrado do cliente.";
+        checkSelfHostedWhatsappStatus(false);
+        selfHostedStatusInterval = setInterval(() => {
+            const configPage = document.getElementById("page-configuracoes");
+            if (configPage && configPage.classList.contains("active")) {
+                checkSelfHostedWhatsappStatus(false);
+            }
+        }, 4000);
+    } else if (provider === "evolution") {
+        if (selfPanel) selfPanel.style.display = "none";
+        if (urlField) urlField.style.display = "block";
+        if (instField) instField.style.display = "block";
+        if (clientTokenField) clientTokenField.style.display = "none";
+        if (urlInput) urlInput.placeholder = "https://evolution.seudominio.com";
+        if (instInput) instInput.placeholder = "Nome da instância (ex: GranjaViana)";
+        if (hint) hint.textContent = "Evolution API: Informe a URL base do servidor, o nome da instância conectada e a Global/Instance API Key.";
+    } else if (provider === "zapi") {
+        if (urlField) urlField.style.display = "none";
+        if (instField) instField.style.display = "block";
+        if (clientTokenField) clientTokenField.style.display = "block";
+        if (instInput) instInput.placeholder = "ID da Instância Z-API";
+        if (hint) hint.textContent = "Z-API: Informe o ID da Instância, o Token da Instância e (se ativado na Z-API) o Client-Token de Segurança.";
+    } else if (provider === "ultramsg") {
+        if (urlField) urlField.style.display = "none";
+        if (instField) instField.style.display = "block";
+        if (clientTokenField) clientTokenField.style.display = "none";
+        if (instInput) instInput.placeholder = "Ex: instance12345";
+        if (hint) hint.textContent = "UltraMsg: Informe o Instance ID (ex: instance12345) e o Token do painel UltraMsg.";
+    } else if (provider === "waha") {
+        if (urlField) urlField.style.display = "block";
+        if (instField) instField.style.display = "block";
+        if (clientTokenField) clientTokenField.style.display = "none";
+        if (urlInput) urlInput.placeholder = "http://localhost:3000";
+        if (instInput) instInput.placeholder = "default";
+        if (hint) hint.textContent = "WAHA: Informe a URL do servidor WAHA, o nome da sessão (ex: default) e a API Key (se configurada).";
+    } else if (provider === "webhook") {
+        if (urlField) urlField.style.display = "block";
+        if (instField) instField.style.display = "none";
+        if (clientTokenField) clientTokenField.style.display = "none";
+        if (urlInput) urlInput.placeholder = "https://seu-n8n-ou-webhook.com/webhook/enviar-recibo";
+        if (hint) hint.textContent = "Webhook POST JSON: O sistema enviará { phone, clientName, fileName, caption, pdfBase64, pdfDataUri } via POST.";
+    }
 }
 
 export async function handleCompanyConfigSave(e) {
@@ -57,7 +220,12 @@ export async function handleCompanyConfigSave(e) {
         email: document.getElementById("companyEmail")?.value.trim() || "",
         chavePix: document.getElementById("companyPix")?.value.trim() || "",
         favorecidoPix: document.getElementById("companyPixFavorecido")?.value.trim() || "",
-        mensagemRodape: document.getElementById("companyFooter")?.value.trim() || DEFAULT_EMPRESA.mensagemRodape
+        mensagemRodape: document.getElementById("companyFooter")?.value.trim() || DEFAULT_EMPRESA.mensagemRodape,
+        whatsappApiProvider: document.getElementById("whatsappApiProvider")?.value.trim() || "",
+        whatsappApiUrl: document.getElementById("whatsappApiUrl")?.value.trim() || "",
+        whatsappApiInstance: document.getElementById("whatsappApiInstance")?.value.trim() || "",
+        whatsappApiToken: document.getElementById("whatsappApiToken")?.value.trim() || "",
+        whatsappApiClientToken: document.getElementById("whatsappApiClientToken")?.value.trim() || ""
     };
 
     if (!state.db.config) state.db.config = {};
@@ -1141,6 +1309,133 @@ function triggerBlobDownload(blob, fileName) {
     setTimeout(() => URL.revokeObjectURL(url), 5000);
 }
 
+function blobToBase64Pure(blob) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+            const dataUrl = String(reader.result || "");
+            const base64 = dataUrl.includes(",") ? dataUrl.split(",")[1] : dataUrl;
+            resolve(base64);
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+    });
+}
+
+async function sendPdfViaWhatsappApi({ emp, phoneDDI, clienteNome, pdfBlob, fileName, caption }) {
+    const provider = emp.whatsappApiProvider;
+    const baseUrl = String(emp.whatsappApiUrl || "").replace(/\/+$/, "");
+    const instance = String(emp.whatsappApiInstance || "").trim();
+    const token = String(emp.whatsappApiToken || "").trim();
+    const clientToken = String(emp.whatsappApiClientToken || "").trim();
+
+    const base64Pure = await blobToBase64Pure(pdfBlob);
+
+    let url = "";
+    let headers = { "Content-Type": "application/json" };
+    let body = {};
+
+    if (provider === "proprio") {
+        const targetUrl = baseUrl || "http://localhost:3001";
+        url = `${targetUrl}/send-receipt`;
+        body = {
+            phone: phoneDDI,
+            clientName: clienteNome,
+            fileName,
+            mimetype: "application/pdf",
+            caption,
+            pdfBase64: base64Pure
+        };
+    } else if (provider === "evolution") {
+        if (!baseUrl || !instance || !token) {
+            throw new Error("Configure URL, Instância e API Key da Evolution API nos Ajustes.");
+        }
+        url = `${baseUrl}/message/sendMedia/${encodeURIComponent(instance)}`;
+        headers["apikey"] = token;
+        body = {
+            number: phoneDDI,
+            mediatype: "document",
+            mimetype: "application/pdf",
+            caption,
+            media: base64Pure,
+            fileName
+        };
+    } else if (provider === "zapi") {
+        if (!instance || !token) {
+            throw new Error("Configure o ID da Instância e o Token da Z-API nos Ajustes.");
+        }
+        url = `https://api.z-api.io/instances/${encodeURIComponent(instance)}/token/${encodeURIComponent(token)}/send-document/pdf`;
+        if (clientToken) headers["Client-Token"] = clientToken;
+        body = {
+            phone: phoneDDI,
+            document: `data:application/pdf;base64,${base64Pure}`,
+            fileName,
+            caption
+        };
+    } else if (provider === "ultramsg") {
+        if (!instance || !token) {
+            throw new Error("Configure a Instância e o Token da UltraMsg nos Ajustes.");
+        }
+        url = `https://api.ultramsg.com/${encodeURIComponent(instance)}/messages/document`;
+        body = {
+            token,
+            to: phoneDDI,
+            filename: fileName,
+            document: base64Pure,
+            caption
+        };
+    } else if (provider === "waha") {
+        if (!baseUrl) {
+            throw new Error("Configure a URL do servidor WAHA nos Ajustes.");
+        }
+        url = `${baseUrl}/api/sendFile`;
+        if (token) headers["X-Api-Key"] = token;
+        body = {
+            chatId: `${phoneDDI}@c.us`,
+            file: {
+                mimetype: "application/pdf",
+                filename: fileName,
+                data: base64Pure
+            },
+            caption,
+            session: instance || "default"
+        };
+    } else if (provider === "webhook") {
+        if (!baseUrl) {
+            throw new Error("Configure a URL do Webhook nos Ajustes.");
+        }
+        url = baseUrl;
+        if (token) {
+            headers["Authorization"] = `Bearer ${token}`;
+            headers["apikey"] = token;
+        }
+        body = {
+            phone: phoneDDI,
+            clientName: clienteNome,
+            fileName,
+            mimetype: "application/pdf",
+            caption,
+            pdfBase64: base64Pure,
+            pdfDataUri: `data:application/pdf;base64,${base64Pure}`
+        };
+    } else {
+        throw new Error("Provedor de API inválido.");
+    }
+
+    const response = await fetch(url, {
+        method: "POST",
+        headers,
+        body: JSON.stringify(body)
+    });
+
+    if (!response.ok) {
+        const errText = await response.text().catch(() => "");
+        throw new Error(`Erro HTTP ${response.status}: ${errText.slice(0, 120) || "Verifique as credenciais da API"}`);
+    }
+
+    return true;
+}
+
 export async function sendSaleReceiptWhatsApp() {
     const sale = state.db.historico.find(h => Number(h.id) === Number(currentReceiptSaleId));
     if (!sale) return toast("Selecione uma venda para enviar o recibo.");
@@ -1159,11 +1454,73 @@ export async function sendSaleReceiptWhatsApp() {
     const rodapeAgradecimento = emp.mensagemRodape || DEFAULT_EMPRESA.mensagemRodape;
     const msgAgradecimento = `Olá, *${clienteNome}*! Segue o recibo referente à sua compra na *${nomeEmpresa}*.\n\n${rodapeAgradecimento}`;
 
-    // 1) Se o PDF já está pré-carregado no cache, compartilha o arquivo PDF + mensagem de agradecimento (sem nenhum link)
     const hasReadyCache = cachedReceiptPdf && cachedReceiptPdf.saleId === Number(sale.id) && cachedReceiptPdf.mode === mode;
 
+    // 1) Se a API de WhatsApp estiver configurada nos Ajustes, busca o telefone cadastrado do cliente
+    // e dispara o arquivo PDF + mensagem de agradecimento diretamente para o número dele via API!
+    if (emp.whatsappApiProvider) {
+        let rawPhone = clienteCad?.telefone || "";
+        let phoneDDI = normalizeWhatsappNumber(rawPhone);
+
+        if (!phoneDDI) {
+            const informado = prompt(
+                `O cliente "${clienteNome}" não possui WhatsApp válido cadastrado em Dados → Clientes.\n\nInforme o número com DDD para enviar o PDF (ex: 82999999999):`,
+                rawPhone || ""
+            );
+            if (informado === null) return;
+            phoneDDI = normalizeWhatsappNumber(informado);
+            if (!phoneDDI) {
+                return toast("Número de WhatsApp inválido. Informe o DDD + número.");
+            }
+        }
+
+        const btnZap = document.getElementById("btnSendReceiptWhatsapp");
+        const originalBtnHtml = `<i class="fab fa-whatsapp" style="font-size: 1.05rem;"></i> <span id="btnWhatsappLabel">Enviar PDF</span>`;
+        if (btnZap) {
+            btnZap.disabled = true;
+            btnZap.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Enviando p/ ${esc(clienteNome.split(" ")[0])}...`;
+        }
+
+        try {
+            const pdfData = hasReadyCache ? cachedReceiptPdf : await generateReceiptPdfFile(sale, mode);
+            cachedReceiptPdf = { saleId: Number(sale.id), mode, ...pdfData };
+
+            await sendPdfViaWhatsappApi({
+                emp,
+                phoneDDI,
+                clienteNome,
+                pdfBlob: pdfData.pdfBlob,
+                fileName: pdfData.fileName,
+                caption: msgAgradecimento
+            });
+
+            registrarLog({
+                acao: "INCLUSAO",
+                modulo: "VENDAS",
+                resumo: `Recibo em PDF (${pdfData.fileName}) enviado via API WhatsApp para ${clienteNome} (${clienteCad?.telefone || phoneDDI})`,
+                detalhes: { vendaId: sale.id, cliente: clienteNome, telefone: phoneDDI, arquivo: pdfData.fileName }
+            });
+
+            toast(`✅ PDF enviado diretamente para o WhatsApp de ${clienteNome} (${clienteCad?.telefone || phoneDDI})!`);
+            return;
+        } catch (err) {
+            console.error("Erro no envio via API WhatsApp:", err);
+            toast("Falha na API WhatsApp: " + (err?.message || "verifique os Ajustes"));
+            return;
+        } finally {
+            if (btnZap) {
+                btnZap.disabled = false;
+                btnZap.innerHTML = originalBtnHtml;
+            }
+        }
+    }
+
+    // 2) Modo sem API externa: compartilhamento nativo do arquivo PDF (copia o telefone do cliente automaticamente para facilitar a busca)
     if (hasReadyCache && navigator.canShare && navigator.canShare({ files: [cachedReceiptPdf.pdfFile] })) {
         try {
+            if (clienteCad?.telefone && navigator.clipboard?.writeText) {
+                navigator.clipboard.writeText(clienteCad.telefone.replace(/\D/g, "")).catch(() => {});
+            }
             await navigator.share({
                 files: [cachedReceiptPdf.pdfFile],
                 title: cachedReceiptPdf.fileName,

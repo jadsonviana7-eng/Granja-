@@ -4,4 +4,6 @@ dist-ssr
 *.local
 .env
 .DS_Store
+whatsapp_auth_session
+
 

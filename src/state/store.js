@@ -138,7 +138,12 @@ export function normalizeEmpresa(empresa) {
         endereco: String(merged.endereco || "").trim(),
         chavePix: String(merged.chavePix || merged.pix || "").trim(),
         favorecidoPix: String(merged.favorecidoPix || merged.favorecido_pix || "").trim(),
-        mensagemRodape: String(merged.mensagemRodape ?? merged.rodape ?? DEFAULT_EMPRESA.mensagemRodape).trim()
+        mensagemRodape: String(merged.mensagemRodape ?? merged.rodape ?? DEFAULT_EMPRESA.mensagemRodape).trim(),
+        whatsappApiProvider: String(merged.whatsappApiProvider || merged.whatsapp_api_provider || "").trim(),
+        whatsappApiUrl: String(merged.whatsappApiUrl || merged.whatsapp_api_url || "").trim(),
+        whatsappApiInstance: String(merged.whatsappApiInstance || merged.whatsapp_api_instance || "").trim(),
+        whatsappApiToken: String(merged.whatsappApiToken || merged.whatsapp_api_token || "").trim(),
+        whatsappApiClientToken: String(merged.whatsappApiClientToken || merged.whatsapp_api_client_token || "").trim()
     };
 }
 

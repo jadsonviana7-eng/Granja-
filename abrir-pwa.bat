@@ -13,5 +13,8 @@ if not exist "node_modules" (
   call npm install
 )
 
+echo Iniciando Servidor Proprio de WhatsApp API (porta 3001)...
+start "WhatsApp API - Granja Viana" cmd /k "node whatsapp-server.mjs"
+
 start "" "http://localhost:8765/"
 call npm run dev
