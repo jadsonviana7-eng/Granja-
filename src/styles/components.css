@@ -170,6 +170,16 @@ input::placeholder {
     color: #fff;
 }
 
+.btn.whatsapp {
+    background: linear-gradient(135deg, #25d366, #128c7e);
+    color: #fff;
+    box-shadow: 0 4px 14px rgba(37, 211, 102, 0.26);
+}
+.btn.whatsapp:hover {
+    filter: brightness(1.06);
+    transform: translateY(-1px);
+}
+
 .btn.ghost {
     background: var(--surface-2);
     color: var(--ink);

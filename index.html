@@ -1608,11 +1608,15 @@
                 </div>
             </div>
             <div class="modal-footer">
-                <div class="button-group" style="margin-top: 0; flex-direction: row !important; width: 100%;">
+                <div class="button-group edit-modal-actions" style="margin-top: 0; width: 100%;">
                     <button type="button" class="btn ghost" onclick="closeReceiptModal()"
-                        style="flex: 1;">Fechar</button>
-                    <button type="button" class="btn primary" onclick="printSaleReceipt()" style="flex: 2;">
-                        <i class="fas fa-print"></i> Imprimir / Salvar PDF
+                        style="flex: 0.8;">Fechar</button>
+                    <button type="button" id="btnSendReceiptWhatsapp" class="btn whatsapp"
+                        onclick="sendSaleReceiptWhatsApp()" style="flex: 1.35;">
+                        <i class="fab fa-whatsapp" style="font-size: 1.05rem;"></i> <span id="btnWhatsappLabel">WhatsApp</span>
+                    </button>
+                    <button type="button" class="btn primary" onclick="printSaleReceipt()" style="flex: 1.35;">
+                        <i class="fas fa-print"></i> Imprimir / PDF
                     </button>
                 </div>
             </div>

@@ -887,6 +887,133 @@ export function renderReceiptPreview() {
     }
 
     container.innerHTML = `<style>${getInvoiceStyles(mode)}</style><div class="a4-page-sheet">${contentHtml}</div>`;
+
+    const clienteNome = sale.cliente || "Consumidor Geral";
+    const clienteCad = (state.db.clientes || []).find(
+        c => (sale.cliente_id && String(c.id) === String(sale.cliente_id)) ||
+             String(c.nome || "").trim().toLowerCase() === String(clienteNome).trim().toLowerCase()
+    );
+    const btnZap = document.getElementById("btnSendReceiptWhatsapp");
+    const lblZap = document.getElementById("btnWhatsappLabel");
+    if (btnZap) {
+        if (clienteCad?.telefone) {
+            btnZap.title = `Enviar recibo para ${clienteNome} (${clienteCad.telefone})`;
+            if (lblZap) lblZap.textContent = "WhatsApp";
+        } else {
+            btnZap.title = `Cliente sem telefone cadastrado — clique para informar o número e enviar`;
+            if (lblZap) lblZap.textContent = "WhatsApp";
+        }
+    }
+}
+
+function normalizeWhatsappNumber(rawPhone) {
+    const digits = String(rawPhone || "").replace(/\D/g, "").replace(/^0+/, "");
+    if (!digits) return "";
+    if ((digits.length === 12 || digits.length === 13) && digits.startsWith("55")) {
+        return digits;
+    }
+    if (digits.length === 10 || digits.length === 11) {
+        return `55${digits}`;
+    }
+    return digits.length >= 10 ? digits : "";
+}
+
+export function sendSaleReceiptWhatsApp() {
+    const sale = state.db.historico.find(h => Number(h.id) === Number(currentReceiptSaleId));
+    if (!sale) return toast("Selecione uma venda para enviar o recibo.");
+
+    const emp = getEmpresaConfig();
+    const { db } = state;
+
+    const clienteNome = sale.cliente || "Consumidor Geral";
+    const clienteCad = (db.clientes || []).find(
+        c => (sale.cliente_id && String(c.id) === String(sale.cliente_id)) ||
+             String(c.nome || "").trim().toLowerCase() === String(clienteNome).trim().toLowerCase()
+    );
+
+    let rawPhone = clienteCad?.telefone || "";
+    let phoneDDI = normalizeWhatsappNumber(rawPhone);
+
+    if (!phoneDDI) {
+        const informado = prompt(
+            `O cliente "${clienteNome}" não possui WhatsApp válido cadastrado.\n\nInforme o número com DDD (ex: 82999999999):`,
+            rawPhone || ""
+        );
+        if (informado === null) return;
+        phoneDDI = normalizeWhatsappNumber(informado);
+        if (!phoneDDI) {
+            return toast("Número de WhatsApp inválido. Informe o DDD + número.");
+        }
+    }
+
+    const produtoNome = sale.produto || "Ovos / Produto da Granja";
+    const produtoCad = (db.produtos || []).find(
+        p => String(p.id) === String(sale.produto_id) ||
+             String(p.nome || "").trim().toLowerCase() === String(produtoNome).trim().toLowerCase()
+    );
+
+    const qtd = Number(sale.qtd ?? sale.quantidade) || 1;
+    const valorUnitario = Number(sale.valorUnitario ?? sale.valor_unitario) || (qtd > 0 ? (Number(sale.valor) || 0) / qtd : 0);
+    const subtotalBruto = qtd * valorUnitario;
+    const desconto = Number(sale.desconto) || 0;
+    const valorTotal = Number(sale.valor ?? sale.valor_total) || Math.max(0, subtotalBruto - desconto);
+
+    const ovosPorUn = Number(produtoCad?.ovosPorItem) || 0;
+    const totalOvosVenda = ovosPorUn > 0 ? ovosPorUn * qtd : 0;
+
+    const statusAtual = String(sale.status || "pago").toLowerCase();
+    const isPago = statusAtual === "pago";
+    const dataVendaBR = formatarDataBR(sale.data || sale.data_transacao || getTodayISO());
+    const dataPagBR = sale.dataPagamento ? formatarDataBR(sale.dataPagamento) : (isPago ? dataVendaBR : "");
+    const numRecibo = String(sale.id || "").slice(-6).padStart(6, "0");
+
+    const linhas = [];
+    linhas.push(`🥚 *${(emp.nome || DEFAULT_EMPRESA.nome).toUpperCase()}*`);
+    if (emp.subtitulo) linhas.push(`_${emp.subtitulo}_`);
+    if (emp.documento) {
+        const digitosDoc = String(emp.documento).replace(/\D/g, "");
+        const rotuloDoc = digitosDoc.length > 11 ? "CNPJ" : "CPF";
+        linhas.push(`${rotuloDoc}: ${formatarCpfCnpj(emp.documento)}`);
+    }
+    if (emp.telefone) linhas.push(`Tel: ${emp.telefone}`);
+    linhas.push(`--------------------------------`);
+    linhas.push(`🧾 *RECIBO DE VENDA Nº ${numRecibo}*`);
+    linhas.push(`📅 *Data:* ${dataVendaBR}`);
+    linhas.push(`👤 *Cliente:* ${clienteNome}`);
+    if (clienteCad?.cidade) linhas.push(`📍 *Cidade:* ${clienteCad.cidade}`);
+    linhas.push(`--------------------------------`);
+    linhas.push(`📦 *Produto:* ${produtoNome}`);
+    linhas.push(`🔢 *Quantidade:* ${formatNumber(qtd)} ${sale.unidade || "un"}${totalOvosVenda > 0 ? ` (${totalOvosVenda.toLocaleString("pt-BR")} ovos)` : ""}`);
+    linhas.push(`💲 *Valor Unit.:* ${money(valorUnitario)}`);
+    if (desconto > 0) {
+        linhas.push(`Subtotal: ${money(subtotalBruto)}`);
+        linhas.push(`Desconto: - ${money(desconto)}`);
+    }
+    linhas.push(`💰 *VALOR TOTAL: ${money(valorTotal)}*`);
+    linhas.push(`--------------------------------`);
+    if (isPago) {
+        linhas.push(`✅ *Situação:* PAGO / QUITADO${dataPagBR ? ` (${dataPagBR})` : ""}`);
+    } else {
+        linhas.push(`⏳ *Situação:* PENDENTE DE PAGAMENTO`);
+    }
+    if (sale.descricao) {
+        linhas.push(`📝 *Obs:* ${sale.descricao}`);
+    }
+    if (emp.chavePix && (!isPago || emp.chavePix)) {
+        const favorecido = emp.favorecidoPix || emp.responsavel || emp.nome || DEFAULT_EMPRESA.nome;
+        linhas.push(`--------------------------------`);
+        linhas.push(`💠 *Dados PIX:*`);
+        linhas.push(`Chave: *${emp.chavePix}*`);
+        linhas.push(`Favorecido: ${favorecido}`);
+    }
+    linhas.push(`--------------------------------`);
+    linhas.push(`_${emp.mensagemRodape || DEFAULT_EMPRESA.mensagemRodape}_`);
+
+    const textoFinal = linhas.join("\n");
+    const whatsappUrl = `https://wa.me/${phoneDDI}?text=${encodeURIComponent(textoFinal)}`;
+
+    window.open(whatsappUrl, "_blank", "noopener,noreferrer");
+    toast(`Abrindo WhatsApp de ${clienteNome}...`);
 }
 
 export function printSaleReceipt() {

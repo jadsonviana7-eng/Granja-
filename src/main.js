@@ -103,7 +103,8 @@ import {
     openReceiptFromEditModal,
     closeReceiptModal,
     renderReceiptPreview,
-    printSaleReceipt
+    printSaleReceipt,
+    sendSaleReceiptWhatsApp
 } from './ui/reports.js';
 import {
     buildTabs,
@@ -252,6 +253,7 @@ Object.assign(window, {
     closeReceiptModal,
     renderReceiptPreview,
     printSaleReceipt,
+    sendSaleReceiptWhatsApp,
     renderSystemLogs,
     exportarLogsCSV,
     resetApp
