@@ -121,6 +121,44 @@ export async function logoutSelfHostedWhatsapp() {
     }
 }
 
+export async function requestSelfHostedPairingCode() {
+    const baseUrl = (document.getElementById("whatsappApiUrl")?.value.trim() || "http://localhost:3001").replace(/\/+$/, "");
+    const emp = getEmpresaConfig();
+    const numeroInformado = prompt(
+        "Informe o número do WhatsApp da Granja com DDD (apenas números, ex: 82988376401):",
+        (emp.telefone || "").replace(/\D/g, "")
+    );
+    if (!numeroInformado) return;
+
+    const codeBox = document.getElementById("whatsappPairingCodeResult");
+    if (codeBox) {
+        codeBox.style.display = "block";
+        codeBox.textContent = "Gerando código...";
+    }
+
+    try {
+        const res = await fetch(`${baseUrl}/pair-code`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ phone: numeroInformado })
+        });
+        const data = await res.json();
+        if (!res.ok || !data.ok) {
+            throw new Error(data.error || "Erro ao gerar código");
+        }
+        if (codeBox) {
+            codeBox.innerHTML = `Código: <span style="user-select:all;">${esc(data.code)}</span><div style="font-size:0.75rem; font-weight:600; letter-spacing:0; margin-top:4px; color:#047857;">No WhatsApp → Aparelhos Conectados → Conectar com número de telefone → Digite o código acima</div>`;
+        }
+        if (navigator.clipboard?.writeText) {
+            navigator.clipboard.writeText(String(data.code).replace("-", "")).catch(() => {});
+        }
+        toast(`Código ${data.code} gerado e copiado!`);
+    } catch (err) {
+        if (codeBox) codeBox.style.display = "none";
+        toast("Erro: " + err.message);
+    }
+}
+
 export function toggleWhatsappApiFields() {
     const provider = document.getElementById("whatsappApiProvider")?.value || "";
     const container = document.getElementById("whatsappApiFieldsContainer");
@@ -1456,9 +1494,13 @@ export async function sendSaleReceiptWhatsApp() {
 
     const hasReadyCache = cachedReceiptPdf && cachedReceiptPdf.saleId === Number(sale.id) && cachedReceiptPdf.mode === mode;
 
-    // 1) Se a API de WhatsApp estiver configurada nos Ajustes, busca o telefone cadastrado do cliente
-    // e dispara o arquivo PDF + mensagem de agradecimento diretamente para o número dele via API!
-    if (emp.whatsappApiProvider) {
+    const isMobileDevice = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent || "");
+    const apiBaseUrl = String(emp.whatsappApiUrl || "").trim();
+    const isLocalhostUrl = !apiBaseUrl || /^https?:\/\/(localhost|127\.0\.0\.1)\b/i.test(apiBaseUrl);
+    const canUseApiFromHere = Boolean(emp.whatsappApiProvider) && !(isMobileDevice && emp.whatsappApiProvider === "proprio" && isLocalhostUrl);
+
+    // 1) Se a API de WhatsApp estiver configurada e acessível pelo dispositivo atual (PC ou URL HTTPS na nuvem):
+    if (canUseApiFromHere) {
         let rawPhone = clienteCad?.telefone || "";
         let phoneDDI = normalizeWhatsappNumber(rawPhone);
 

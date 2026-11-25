@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: granja-viana-whatsapp-api
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: node whatsapp-server.mjs
+    envVars:
+      - key: NODE_VERSION
+        value: 20

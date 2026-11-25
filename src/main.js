@@ -101,6 +101,7 @@ import {
     toggleWhatsappApiFields,
     checkSelfHostedWhatsappStatus,
     logoutSelfHostedWhatsapp,
+    requestSelfHostedPairingCode,
     handleCompanyConfigSave,
     openSaleReceipt,
     openReceiptFromEditModal,
@@ -261,6 +262,7 @@ Object.assign(window, {
     toggleWhatsappApiFields,
     checkSelfHostedWhatsappStatus,
     logoutSelfHostedWhatsapp,
+    requestSelfHostedPairingCode,
     renderSystemLogs,
     exportarLogsCSV,
     resetApp

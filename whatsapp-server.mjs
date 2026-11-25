@@ -194,6 +194,34 @@ const server = http.createServer(async (req, res) => {
         return;
     }
 
+    if (req.method === "POST" && url.pathname === "/pair-code") {
+        try {
+            const payload = await readJsonBody(req);
+            const digits = String(payload.phone || "").replace(/\D/g, "").replace(/^0+/, "");
+            const fullPhone = (digits.length === 10 || digits.length === 11) ? `55${digits}` : digits;
+
+            if (!fullPhone || fullPhone.length < 12) {
+                res.writeHead(400, { "Content-Type": "application/json; charset=utf-8" });
+                res.end(JSON.stringify({ ok: false, error: "Informe o número do WhatsApp com DDD (ex: 82988376401)." }));
+                return;
+            }
+            if (!sock) {
+                res.writeHead(400, { "Content-Type": "application/json; charset=utf-8" });
+                res.end(JSON.stringify({ ok: false, error: "Servidor ainda inicializando. Tente novamente em 3 segundos." }));
+                return;
+            }
+
+            const code = await sock.requestPairingCode(fullPhone);
+            const formattedCode = code?.length === 8 ? `${code.slice(0, 4)}-${code.slice(4)}` : code;
+            res.writeHead(200, { "Content-Type": "application/json; charset=utf-8" });
+            res.end(JSON.stringify({ ok: true, code: formattedCode, phone: fullPhone }));
+        } catch (err) {
+            res.writeHead(500, { "Content-Type": "application/json; charset=utf-8" });
+            res.end(JSON.stringify({ ok: false, error: err.message || "Não foi possível gerar o código de pareamento." }));
+        }
+        return;
+    }
+
     if (req.method === "POST" && url.pathname === "/logout") {
         try {
             if (sock) {
