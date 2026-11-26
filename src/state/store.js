@@ -139,8 +139,14 @@ export function normalizeEmpresa(empresa) {
         chavePix: String(merged.chavePix || merged.pix || "").trim(),
         favorecidoPix: String(merged.favorecidoPix || merged.favorecido_pix || "").trim(),
         mensagemRodape: String(merged.mensagemRodape ?? merged.rodape ?? DEFAULT_EMPRESA.mensagemRodape).trim(),
-        whatsappApiProvider: String(merged.whatsappApiProvider || merged.whatsapp_api_provider || "").trim(),
-        whatsappApiUrl: String(merged.whatsappApiUrl || merged.whatsapp_api_url || "").trim(),
+        whatsappApiProvider: String(merged.whatsappApiProvider || merged.whatsapp_api_provider || "proprio").trim(),
+        whatsappApiUrl: (() => {
+            const rawUrl = String(merged.whatsappApiUrl || merged.whatsapp_api_url || "").trim();
+            if (!rawUrl || rawUrl === "http://localhost:3001") {
+                return "https://granja-bykk.onrender.com";
+            }
+            return rawUrl;
+        })(),
         whatsappApiInstance: String(merged.whatsappApiInstance || merged.whatsapp_api_instance || "").trim(),
         whatsappApiToken: String(merged.whatsappApiToken || merged.whatsapp_api_token || "").trim(),
         whatsappApiClientToken: String(merged.whatsappApiClientToken || merged.whatsapp_api_client_token || "").trim()
@@ -172,6 +178,9 @@ export function normalizeDatabase(data) {
     data.config.empresa = normalizeEmpresa(data.config.empresa);
 
     data.insumos = (data.insumos || []).filter(Boolean).map(normalizeInsumo);
+    data.clientes = (data.clientes || []).filter(Boolean).sort((a, b) =>
+        String(a?.nome || "").trim().localeCompare(String(b?.nome || "").trim(), "pt-BR", { sensitivity: "base" })
+    );
     data.produtos = (data.produtos || []).filter(Boolean).map(normalizeProduto);
     data.coletas = (data.coletas || []).filter(Boolean).map(normalizeColeta);
     data.historico = (data.historico || []).filter(Boolean).map(normalizeHistorico);

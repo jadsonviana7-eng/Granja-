@@ -570,12 +570,18 @@ const server = http.createServer(async (req, res) => {
     res.end(JSON.stringify({ ok: false, error: "Rota não encontrada" }));
 });
 
+const RENDER_URL = process.env.RENDER_EXTERNAL_URL || "https://granja-bykk.onrender.com";
+
 server.listen(PORT, "0.0.0.0", () => {
     console.log(`====================================================`);
-    console.log(`[WhatsApp API] Servidor Próprio rodando em http://localhost:${PORT}`);
+    console.log(`[WhatsApp API] Servidor Próprio rodando na porta ${PORT}`);
     console.log(`[WhatsApp Bridge] Ponte em nuvem + Backup de Sessão no Supabase ativos!`);
     console.log(`====================================================`);
     startWhatsApp();
     setInterval(pollSupabaseBridgeCommands, 1500);
     setInterval(syncBridgeStatusToSupabase, 12000);
+    // Keep-alive automático a cada 10 minutos para evitar hibernação no Render Free
+    setInterval(() => {
+        fetch(`${RENDER_URL}/status`).catch(() => {});
+    }, 10 * 60 * 1000);
 });

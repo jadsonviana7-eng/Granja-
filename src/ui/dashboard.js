@@ -4,7 +4,7 @@ import { Portuguese } from 'flatpickr/dist/l10n/pt.js';
 import { NOMES_MESES } from '../config/constants.js';
 import { state } from '../state/store.js';
 import { renderFinance, renderExtract } from '../domain/financeiro.js';
-import { dateToISO, formatarDataBR, padZero } from '../utils/formatters.js';
+import { dateToISO, formatarDataBR, padZero, esc, money } from '../utils/formatters.js';
 
 const activeCharts = {};
 let extratoPickerInstance = null;
@@ -25,12 +25,104 @@ function generateMonthDaysISO(periodoInicio, periodoFim) {
     return days;
 }
 
+function renderClientRanking(vendasMes, clientes) {
+    const container = document.getElementById('clientRankingList');
+    const badgeEl = document.getElementById('rankingClientsBadge');
+    if (!container) return;
+
+    const map = {};
+    vendasMes.forEach(v => {
+        const nome = String(v.cliente || "Consumidor Geral").trim() || "Consumidor Geral";
+        const key = nome.toLowerCase();
+        if (!map[key]) {
+            const clienteCad = (clientes || []).find(
+                c => String(c.nome || "").trim().toLowerCase() === key
+            );
+            map[key] = {
+                nome,
+                cidade: clienteCad?.cidade || "",
+                totalValor: 0,
+                qtdCompras: 0,
+                qtdItens: 0
+            };
+        }
+        map[key].totalValor += Number(v.valor) || 0;
+        map[key].qtdCompras += 1;
+        map[key].qtdItens += Number(v.qtd ?? v.quantidade) || 0;
+    });
+
+    const ranking = Object.values(map).sort((a, b) => b.totalValor - a.totalValor);
+
+    if (badgeEl) {
+        badgeEl.textContent = ranking.length > 0
+            ? `${ranking.length} ${ranking.length === 1 ? 'cliente' : 'clientes'}`
+            : 'Sem vendas';
+    }
+
+    if (ranking.length === 0) {
+        container.innerHTML = `
+            <div class="ranking-empty-state">
+                <i class="fas fa-medal"></i>
+                <span>Nenhuma venda registrada neste período.</span>
+            </div>
+        `;
+        return;
+    }
+
+    const totalPeriodo = ranking.reduce((acc, item) => acc + item.totalValor, 0);
+    const maxValor = ranking[0]?.totalValor || 1;
+
+    container.innerHTML = ranking.map((item, idx) => {
+        const pos = idx + 1;
+        const pctBar = Math.max(4, Math.round((item.totalValor / maxValor) * 100));
+        const pctShare = totalPeriodo > 0 ? ((item.totalValor / totalPeriodo) * 100).toFixed(1).replace('.', ',') : '0,0';
+
+        let posClass = 'rank-other';
+        let posContent = `${pos}º`;
+        if (pos === 1) {
+            posClass = 'rank-gold';
+            posContent = '<i class="fas fa-crown"></i>';
+        } else if (pos === 2) {
+            posClass = 'rank-silver';
+            posContent = '2º';
+        } else if (pos === 3) {
+            posClass = 'rank-bronze';
+            posContent = '3º';
+        }
+
+        const comprasLabel = `${item.qtdCompras} ${item.qtdCompras === 1 ? 'compra' : 'compras'}`;
+        const cidadeBadge = item.cidade ? ` · ${esc(item.cidade)}` : '';
+
+        return `
+            <div class="ranking-item ${pos <= 3 ? 'is-top3' : ''} ${pos === 1 ? 'is-first' : ''}">
+                <div class="ranking-rank-badge ${posClass}" title="${pos}º lugar">
+                    ${posContent}
+                </div>
+                <div class="ranking-info">
+                    <div class="ranking-top-row">
+                        <div class="ranking-name-wrap">
+                            <span class="ranking-client-name" title="${esc(item.nome)}">${esc(item.nome)}</span>
+                            <span class="ranking-meta">${comprasLabel}${cidadeBadge}</span>
+                        </div>
+                        <div class="ranking-value-wrap">
+                            <b class="ranking-value">${money(item.totalValor)}</b>
+                            <span class="ranking-share">${pctShare}%</span>
+                        </div>
+                    </div>
+                    <div class="ranking-bar-track">
+                        <div class="ranking-bar-fill ${posClass}" style="width: ${pctBar}%;"></div>
+                    </div>
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
 export function renderDashboard() {
     const ctxProd = document.getElementById('chartProducao')?.getContext('2d');
-    const ctxClient = document.getElementById('chartVendasCliente')?.getContext('2d');
     const ctxCity = document.getElementById('chartVendasCidade')?.getContext('2d');
 
-    if (!ctxProd || !ctxClient || !ctxCity) return;
+    if (!ctxProd || !ctxCity) return;
 
     Object.values(activeCharts).forEach(chart => chart.destroy());
 
@@ -75,6 +167,8 @@ export function renderDashboard() {
         return h.tipo === 'VENDA' && d >= periodoInicio && d <= periodoFim;
     });
 
+    renderClientRanking(vendasMes, db.clientes);
+
     const groupData = (key) => {
         const map = {};
         vendasMes.forEach(v => {
@@ -96,19 +190,20 @@ export function renderDashboard() {
         maintainAspectRatio: false,
         layout: {
             padding: isMobile
-                ? { top: 10, bottom: 10, left: 10, right: 10 }
-                : { right: 110, left: 20, top: 10, bottom: 10 }
+                ? { top: 8, bottom: 8, left: 8, right: 8 }
+                : { top: 8, bottom: 8, left: 6, right: 6 }
         },
         plugins: {
             legend: {
                 position: isMobile ? 'bottom' : 'right',
                 align: isMobile ? 'start' : 'center',
+                maxWidth: isMobile ? 600 : 380,
                 labels: {
                     boxWidth: 12,
-                    padding: isMobile ? 12 : 20,
+                    padding: isMobile ? 10 : 14,
                     font: {
-                        size: isMobile ? 11 : 12,
-                        weight: isMobile ? '600' : 'normal'
+                        size: isMobile ? 11 : 11.5,
+                        weight: '600'
                     },
                     generateLabels: (chart) => {
                         const data = chart.data;
@@ -132,13 +227,6 @@ export function renderDashboard() {
     };
 
     const coresExpandidas = ['#1b7a43', '#d97706', '#0f766e', '#0284c7', '#65a30d', '#b45309', '#4f46e5', '#dc2626', '#059669', '#ca8a04', '#0d9488'];
-
-    const dataClient = groupData('cliente');
-    activeCharts.client = new Chart(ctxClient, {
-        type: 'doughnut',
-        data: { labels: dataClient.labels, datasets: [{ data: dataClient.values, backgroundColor: coresExpandidas }] },
-        options: pieOptions
-    });
 
     const dataCity = groupData('cidade');
     activeCharts.city = new Chart(ctxCity, {

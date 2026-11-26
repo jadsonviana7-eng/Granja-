@@ -17,7 +17,7 @@ export const DEFAULT_EMPRESA = {
     favorecidoPix: "",
     mensagemRodape: "Obrigado pela preferência! Produtos frescos e selecionados direto da granja.",
     whatsappApiProvider: "proprio",
-    whatsappApiUrl: "http://localhost:3001",
+    whatsappApiUrl: "https://granja-bykk.onrender.com",
     whatsappApiInstance: "",
     whatsappApiToken: "",
     whatsappApiClientToken: ""

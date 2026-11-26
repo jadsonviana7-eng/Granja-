@@ -2,6 +2,7 @@ import { LOW_SUPPLY_THRESHOLD } from '../config/constants.js';
 import { state, save, isCurrentUserAdmin } from '../state/store.js';
 import { supabaseClient } from '../services/supabase.js';
 import { registrarLog } from '../services/logger.js';
+import { autoSendPaidReceiptWhatsApp, autoSendNewSaleReceiptWhatsApp } from '../ui/reports.js';
 import {
     dateToISO,
     formatarDataBR,
@@ -287,7 +288,7 @@ export async function handleSale(e) {
         });
     }
 
-    db.historico.push({
+    const novaVenda = {
         ...payload,
         id: transacaoId,
         data: payload.data_transacao,
@@ -297,7 +298,8 @@ export async function handleSale(e) {
         cliente: clienteNome,
         produto: prod.nome,
         dataPagamento: payload.data_pagamento || ""
-    });
+    };
+    db.historico.push(novaVenda);
 
     save();
     registrarLog({
@@ -322,11 +324,7 @@ export async function handleSale(e) {
     document.getElementById("saleDiscount").value = money(0);
     calculateSaleTotal();
     closeSaleModal();
-    if (alertasInsumos.length > 0) {
-        toast(`Venda registrada! ⚠️ Atenção: ${alertasInsumos.join(" · ")}`);
-    } else {
-        toast("Venda registrada e estoques atualizados!");
-    }
+    autoSendNewSaleReceiptWhatsApp(novaVenda, alertasInsumos);
 }
 
 export async function handleExpense(e) {
@@ -523,7 +521,9 @@ export async function handleEdit(e) {
     if (!item) return;
 
     const today = getTodayISO();
+    const oldStatus = String(item.status || "pago").toLowerCase();
     const newStatus = document.getElementById("editStatus").value;
+    const mudancaParaPago = item.tipo === "VENDA" && oldStatus === "pendente" && String(newStatus).toLowerCase() === "pago";
     let newPaymentDate = document.getElementById("editPaymentDate").value;
 
     if (newStatus === "pago" && !newPaymentDate) newPaymentDate = today;
@@ -570,10 +570,14 @@ export async function handleEdit(e) {
         }
     });
     closeEditModal();
-    toast("Alterações salvas!");
+    if (mudancaParaPago) {
+        autoSendPaidReceiptWhatsApp(item);
+    } else {
+        toast("Alterações salvas!");
+    }
 }
 
-export async function deleteCurrentItem() {
+export function deleteCurrentItem() {
     if (!isCurrentUserAdmin()) return toast("Acesso restrito: apenas administradores podem excluir registros.");
     const { db } = state;
     const id = parseFloat(document.getElementById("editId").value);
@@ -581,63 +585,185 @@ export async function deleteCurrentItem() {
 
     if (!item) return;
 
-    if (!confirm("Excluir permanentemente este lançamento? O estoque de ovos e insumos será estornado.")) return;
+    const isVenda = item.tipo === "VENDA";
+    const heading = document.getElementById("deleteTxHeading");
+    const summaryBox = document.getElementById("deleteTxSummaryBox");
+    const stockNotice = document.getElementById("deleteTxStockNotice");
+    const confirmBtn = document.getElementById("btnConfirmDeleteTx");
 
-    if (supabaseClient) {
-        const { error } = await supabaseClient.from('transacoes').delete().eq('id', id);
-        if (error) return toast("Erro ao excluir no banco!");
+    if (heading) {
+        heading.textContent = isVenda
+            ? "Excluir permanentemente esta venda?"
+            : "Excluir permanentemente esta saída / despesa?";
     }
 
-    if (item.tipo === "VENDA") {
+    const qtd = Number(item.qtd ?? item.quantidade) || 0;
+    const un = item.unidade || "un";
+    const titulo = isVenda ? (item.cliente || "Consumidor Geral") : (item.descricao || item.insumo || "Despesa");
+    const sub = isVenda ? (item.produto || "Produto") : (item.insumo || item.categoria || "Saída Financeira");
+
+    if (summaryBox) {
+        summaryBox.innerHTML = `
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+                <span class="badge ${isVenda ? 'green' : 'red'}" style="font-size:0.65rem;">${isVenda ? 'VENDA' : 'SAÍDA / DESPESA'}</span>
+                <span style="font-size:0.76rem; color:var(--muted); font-weight:700;">${formatarDataBR(item.data)}</span>
+            </div>
+            <div style="font-weight:800; font-size:0.95rem; color:var(--ink);">${esc(titulo)}</div>
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-top:4px; color:var(--ink-soft); font-size:0.82rem;">
+                <span>${esc(sub)} (${formatNumber(qtd)} ${esc(un)})</span>
+                <strong style="color:${isVenda ? 'var(--green)' : 'var(--red)'}; font-size:0.95rem;">${money(item.valor)}</strong>
+            </div>
+        `;
+    }
+
+    const estornos = [];
+    if (isVenda) {
         const produto = db.produtos.find(p => p.nome === item.produto);
-
         if (produto) {
-            const qtdVendida = Number(item.qtd) || 0;
-
             if (produto.tipoOvo && db.estoque[produto.tipoOvo] !== undefined) {
-                const ovosParaDevolver = (Number(produto.ovosPorItem) || 0) * qtdVendida;
-                db.estoque[produto.tipoOvo] += ovosParaDevolver;
+                const ovosDevolver = (Number(produto.ovosPorItem) || 0) * qtd;
+                if (ovosDevolver > 0) {
+                    estornos.push(`<li>🥚 <strong>+${ovosDevolver.toLocaleString('pt-BR')} Ovos (${esc(produto.tipoOvo)})</strong> retornarão ao estoque de ovos.</li>`);
+                }
             }
-
             if (Array.isArray(produto.composicao)) {
                 produto.composicao.forEach(comp => {
                     const insumoNoBanco = db.insumos.find(i => String(i.id) === String(comp.insumoId));
                     if (insumoNoBanco) {
-                        const qtdInsumoParaDevolver = (Number(comp.qtdNecessaria) || 0) * qtdVendida;
-                        insumoNoBanco.qtd = (Number(insumoNoBanco.qtd) || 0) + qtdInsumoParaDevolver;
-                        if (supabaseClient) supabaseClient.from('insumos').update({ qtd: insumoNoBanco.qtd }).eq('id', insumoNoBanco.id);
+                        const qtdInsumo = (Number(comp.qtdNecessaria) || 0) * qtd;
+                        if (qtdInsumo > 0) {
+                            estornos.push(`<li>📦 <strong>+${formatNumber(qtdInsumo)} ${esc(getInsumoUnit(insumoNoBanco))} de ${esc(insumoNoBanco.nome)}</strong> retornará ao estoque de insumos.</li>`);
+                        }
                     }
                 });
             }
         }
-    }
-
-    if (item.tipo === "SAIDA" && item.categoria === "INSUMO" && item.insumoId) {
+    } else if (item.tipo === "SAIDA" && item.categoria === "INSUMO" && item.insumoId) {
         const insumoNoBanco = db.insumos.find(i => String(i.id) === String(item.insumoId));
-        if (insumoNoBanco) {
-            insumoNoBanco.qtd = (Number(insumoNoBanco.qtd) || 0) - (Number(item.qtd) || 0);
-            if (insumoNoBanco.qtd < 0) insumoNoBanco.qtd = 0;
+        if (insumoNoBanco && qtd > 0) {
+            estornos.push(`<li>📦 <strong>-${formatNumber(qtd)} ${esc(getInsumoUnit(insumoNoBanco))} de ${esc(insumoNoBanco.nome)}</strong> será deduzido (estornado) do estoque de insumos.</li>`);
         }
     }
 
-    db.historico = db.historico.filter(h => h.id !== id);
-
-    save();
-    registrarLog({
-        acao: "EXCLUSAO",
-        modulo: item.tipo === "VENDA" ? "VENDAS" : "DESPESAS",
-        resumo: `${item.tipo === "VENDA" ? "Venda" : "Despesa"} excluída: ${item.cliente || item.descricao || item.produto} (${money(item.valor)})`,
-        detalhes: {
-            id: item.id,
-            tipo: item.tipo,
-            data: item.data,
-            cliente: item.cliente || "-",
-            produto: item.produto || item.insumo || "-",
-            quantidade: item.qtd,
-            valorTotal: money(item.valor)
+    if (stockNotice) {
+        if (estornos.length > 0) {
+            stockNotice.style.display = "block";
+            stockNotice.innerHTML = `
+                <div style="font-weight:800; margin-bottom:4px; display:flex; align-items:center; gap:6px;">
+                    <i class="fas fa-boxes"></i> Estorno Automático de Estoque:
+                </div>
+                <ul style="margin:0; padding-left:18px; display:flex; flex-direction:column; gap:3px;">
+                    ${estornos.join("")}
+                </ul>
+            `;
+        } else {
+            stockNotice.style.display = "block";
+            stockNotice.innerHTML = `
+                <div style="font-weight:700; display:flex; align-items:center; gap:6px;">
+                    <i class="fas fa-info-circle"></i> Este lançamento será removido do extrato financeiro (sem impacto no estoque físico).
+                </div>
+            `;
         }
-    });
-    closeEditModal();
-    toast("Venda excluída e estoques estornados!");
+    }
+
+    if (confirmBtn) {
+        confirmBtn.innerHTML = `<i class="fas fa-trash-alt"></i> ${estornos.length > 0 ? "Excluir e Estornar" : "Sim, Excluir"}`;
+    }
+
+    const modal = document.getElementById("deleteTransactionModal");
+    if (modal) modal.style.display = "flex";
+}
+
+export function closeDeleteTransactionModal() {
+    const modal = document.getElementById("deleteTransactionModal");
+    if (modal) modal.style.display = "none";
+}
+
+export async function confirmDeleteCurrentItem() {
+    if (!isCurrentUserAdmin()) return toast("Acesso restrito: apenas administradores podem excluir registros.");
+    const { db } = state;
+    const id = parseFloat(document.getElementById("editId").value);
+    const item = db.historico.find(h => h.id === id);
+
+    if (!item) {
+        closeDeleteTransactionModal();
+        return;
+    }
+
+    const confirmBtn = document.getElementById("btnConfirmDeleteTx");
+    const originalHtml = confirmBtn ? confirmBtn.innerHTML : "";
+    if (confirmBtn) {
+        confirmBtn.disabled = true;
+        confirmBtn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Excluindo...`;
+    }
+
+    try {
+        if (supabaseClient) {
+            const { error } = await supabaseClient.from('transacoes').delete().eq('id', id);
+            if (error) {
+                toast("Erro ao excluir no banco!");
+                return;
+            }
+        }
+
+        if (item.tipo === "VENDA") {
+            const produto = db.produtos.find(p => p.nome === item.produto);
+
+            if (produto) {
+                const qtdVendida = Number(item.qtd) || 0;
+
+                if (produto.tipoOvo && db.estoque[produto.tipoOvo] !== undefined) {
+                    const ovosParaDevolver = (Number(produto.ovosPorItem) || 0) * qtdVendida;
+                    db.estoque[produto.tipoOvo] += ovosParaDevolver;
+                }
+
+                if (Array.isArray(produto.composicao)) {
+                    produto.composicao.forEach(comp => {
+                        const insumoNoBanco = db.insumos.find(i => String(i.id) === String(comp.insumoId));
+                        if (insumoNoBanco) {
+                            const qtdInsumoParaDevolver = (Number(comp.qtdNecessaria) || 0) * qtdVendida;
+                            insumoNoBanco.qtd = (Number(insumoNoBanco.qtd) || 0) + qtdInsumoParaDevolver;
+                            if (supabaseClient) supabaseClient.from('insumos').update({ qtd: insumoNoBanco.qtd }).eq('id', insumoNoBanco.id);
+                        }
+                    });
+                }
+            }
+        }
+
+        if (item.tipo === "SAIDA" && item.categoria === "INSUMO" && item.insumoId) {
+            const insumoNoBanco = db.insumos.find(i => String(i.id) === String(item.insumoId));
+            if (insumoNoBanco) {
+                insumoNoBanco.qtd = (Number(insumoNoBanco.qtd) || 0) - (Number(item.qtd) || 0);
+                if (insumoNoBanco.qtd < 0) insumoNoBanco.qtd = 0;
+                if (supabaseClient) supabaseClient.from('insumos').update({ qtd: insumoNoBanco.qtd }).eq('id', insumoNoBanco.id);
+            }
+        }
+
+        db.historico = db.historico.filter(h => h.id !== id);
+
+        save();
+        registrarLog({
+            acao: "EXCLUSAO",
+            modulo: item.tipo === "VENDA" ? "VENDAS" : "DESPESAS",
+            resumo: `${item.tipo === "VENDA" ? "Venda" : "Despesa"} excluída: ${item.cliente || item.descricao || item.produto} (${money(item.valor)})`,
+            detalhes: {
+                id: item.id,
+                tipo: item.tipo,
+                data: item.data,
+                cliente: item.cliente || "-",
+                produto: item.produto || item.insumo || "-",
+                quantidade: item.qtd,
+                valorTotal: money(item.valor)
+            }
+        });
+        closeDeleteTransactionModal();
+        closeEditModal();
+        toast(item.tipo === "VENDA" ? "Venda excluída e estoques estornados!" : "Saída excluída e estoque atualizado!");
+    } finally {
+        if (confirmBtn) {
+            confirmBtn.disabled = false;
+            confirmBtn.innerHTML = originalHtml;
+        }
+    }
 }
 

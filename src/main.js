@@ -80,7 +80,9 @@ import {
     togglePaymentDateField,
     calcEditTotal,
     handleEdit,
-    deleteCurrentItem
+    deleteCurrentItem,
+    closeDeleteTransactionModal,
+    confirmDeleteCurrentItem
 } from './domain/financeiro.js';
 import {
     renderDashboard,
@@ -244,6 +246,8 @@ Object.assign(window, {
     calcEditTotal,
     togglePaymentDateField,
     deleteCurrentItem,
+    closeDeleteTransactionModal,
+    confirmDeleteCurrentItem,
     deleteItem,
     exportarCSV,
     exportarPDF,

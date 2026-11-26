@@ -41,7 +41,7 @@ export function renderCompanyConfig() {
     setVal("companyPixFavorecido", emp.favorecidoPix || "");
     setVal("companyFooter", emp.mensagemRodape || "");
     setVal("whatsappApiProvider", emp.whatsappApiProvider || "proprio");
-    setVal("whatsappApiUrl", emp.whatsappApiUrl || "http://localhost:3001");
+    setVal("whatsappApiUrl", (!emp.whatsappApiUrl || emp.whatsappApiUrl === "http://localhost:3001") ? "https://granja-bykk.onrender.com" : emp.whatsappApiUrl);
     setVal("whatsappApiInstance", emp.whatsappApiInstance || "");
     setVal("whatsappApiToken", emp.whatsappApiToken || "");
     setVal("whatsappApiClientToken", emp.whatsappApiClientToken || "");
@@ -136,12 +136,17 @@ export async function checkSelfHostedWhatsappStatus(showFeedback = false) {
     const provider = document.getElementById("whatsappApiProvider")?.value || "";
     if (provider !== "proprio") return;
 
-    const baseUrl = (document.getElementById("whatsappApiUrl")?.value.trim() || "http://localhost:3001").replace(/\/+$/, "");
+    const rawInputUrl = document.getElementById("whatsappApiUrl")?.value.trim() || "";
+    const baseUrl = ((!rawInputUrl || rawInputUrl === "http://localhost:3001") ? "https://granja-bykk.onrender.com" : rawInputUrl).replace(/\/+$/, "");
     const statusText = document.getElementById("whatsappSelfStatusText");
     const qrBox = document.getElementById("whatsappSelfQrBox");
     const qrImg = document.getElementById("whatsappSelfQrImg");
     const btnLogout = document.getElementById("btnWhatsappSelfLogout");
     const badge = document.getElementById("whatsappApiStatusBadge");
+
+    if (showFeedback && statusText) {
+        statusText.innerHTML = `<span style="color: #b45309; font-weight: 700;"><i class="fas fa-spinner fa-spin"></i> Conectando ao servidor ${esc(baseUrl)} (se estiver em repouso no Render, pode levar ~40s para acordar)...</span>`;
+    }
 
     let data = null;
     try {
@@ -176,7 +181,7 @@ export async function checkSelfHostedWhatsappStatus(showFeedback = false) {
             if (showFeedback) toast("WhatsApp conectado e pronto para enviar PDFs!");
         } else if (data.qrDataUrl) {
             if (statusText) {
-                statusText.innerHTML = `<span style="color: #b45309; font-weight: 700;">🟡 Aguardando leitura do QR Code ou Código de 8 dígitos...</span>`;
+                statusText.innerHTML = `<span style="color: #b45309; font-weight: 700;">🟡 Servidor Online! Escaneie o QR Code abaixo ou clique em "Gerar Código":</span>`;
             }
             if (qrImg) qrImg.src = data.qrDataUrl;
             if (qrBox) qrBox.style.display = "block";
@@ -188,7 +193,7 @@ export async function checkSelfHostedWhatsappStatus(showFeedback = false) {
             }
         } else {
             if (statusText) {
-                statusText.innerHTML = `<span style="color: #b45309; font-weight: 700;">⏳ Inicializando sessão do WhatsApp... aguarde alguns segundos.</span>`;
+                statusText.innerHTML = `<span style="color: #b45309; font-weight: 700;">⏳ Inicializando sessão do WhatsApp no servidor... aguarde alguns segundos.</span>`;
             }
             if (qrBox) qrBox.style.display = "none";
             if (btnLogout) btnLogout.style.display = "none";
@@ -197,21 +202,22 @@ export async function checkSelfHostedWhatsappStatus(showFeedback = false) {
     }
 
     if (statusText) {
-        statusText.innerHTML = `<span style="color: var(--red); font-weight: 700;">🔴 Servidor não detectado. Deixe <code>npm run whatsapp</code> ou <code>abrir-pwa.bat</code> rodando no PC.</span>`;
+        statusText.innerHTML = `<span style="color: #b45309; font-weight: 700;">⏳ Acordando servidor na nuvem (${esc(baseUrl)})... No plano gratuito do Render o servidor leva ~40 segundos para despertar. Clique em "Atualizar Status / QR" em alguns segundos.</span>`;
     }
     if (qrBox) qrBox.style.display = "none";
     if (btnLogout) btnLogout.style.display = "none";
     if (badge) {
-        badge.textContent = "Servidor Offline";
-        badge.className = "badge red";
+        badge.textContent = "Despertando Nuvem...";
+        badge.className = "badge amber";
         badge.style.display = "inline-flex";
     }
-    if (showFeedback) toast("Servidor WhatsApp offline. Inicie com 'npm run whatsapp'.");
+    if (showFeedback) toast("Despertando servidor no Render... aguarde ~30s.");
 }
 
 export async function logoutSelfHostedWhatsapp() {
     if (!confirm("Deseja desconectar o número atual do WhatsApp e gerar um novo QR Code?")) return;
-    const baseUrl = (document.getElementById("whatsappApiUrl")?.value.trim() || "http://localhost:3001").replace(/\/+$/, "");
+    const rawInputUrl = document.getElementById("whatsappApiUrl")?.value.trim() || "";
+    const baseUrl = ((!rawInputUrl || rawInputUrl === "http://localhost:3001") ? "https://granja-bykk.onrender.com" : rawInputUrl).replace(/\/+$/, "");
     try {
         if (!shouldUseSupabaseBridgeOnly(baseUrl)) {
             await fetch(`${baseUrl}/logout`, { method: "POST" });
@@ -232,7 +238,8 @@ export async function logoutSelfHostedWhatsapp() {
 }
 
 export async function requestSelfHostedPairingCode() {
-    const baseUrl = (document.getElementById("whatsappApiUrl")?.value.trim() || "http://localhost:3001").replace(/\/+$/, "");
+    const rawInputUrl = document.getElementById("whatsappApiUrl")?.value.trim() || "";
+    const baseUrl = ((!rawInputUrl || rawInputUrl === "http://localhost:3001") ? "https://granja-bykk.onrender.com" : rawInputUrl).replace(/\/+$/, "");
     const savedPairingPhone = localStorage.getItem("granjaViana_pairing_phone") || "";
     const numeroInformado = prompt(
         "Digite o número do WhatsApp DESTE aparelho que você vai conectar (com DDD, ex: 82982289108):\n\n⚠️ Atenção: Deve ser exatamente o número do WhatsApp onde você vai digitar o código!",
@@ -316,8 +323,10 @@ export function toggleWhatsappApiFields() {
         if (instField) instField.style.display = "none";
         if (tokenField) tokenField.style.display = "none";
         if (clientTokenField) clientTokenField.style.display = "none";
-        if (urlInput && !urlInput.value) urlInput.value = "http://localhost:3001";
-        if (urlInput) urlInput.placeholder = "http://localhost:3001 (ou URL na nuvem)";
+        if (urlInput && (!urlInput.value || urlInput.value === "http://localhost:3001")) {
+            urlInput.value = "https://granja-bykk.onrender.com";
+        }
+        if (urlInput) urlInput.placeholder = "https://granja-bykk.onrender.com";
         if (hint) hint.textContent = "Provedor Próprio Gratuito: Escaneie o QR Code acima uma única vez. Todos os recibos em PDF serão enviados diretamente para o telefone cadastrado do cliente.";
         checkSelfHostedWhatsappStatus(false);
         selfHostedStatusInterval = setInterval(() => {
@@ -426,6 +435,132 @@ export async function handleCompanyConfigSave(e) {
     });
 }
 
+function isValidCpfChecksum(digits) {
+    if (!digits || digits.length !== 11 || /^(\d)\1{10}$/.test(digits)) return false;
+    let sum = 0;
+    for (let i = 0; i < 9; i++) sum += parseInt(digits[i], 10) * (10 - i);
+    let rev = 11 - (sum % 11);
+    if (rev === 10 || rev === 11) rev = 0;
+    if (rev !== parseInt(digits[9], 10)) return false;
+    sum = 0;
+    for (let i = 0; i < 10; i++) sum += parseInt(digits[i], 10) * (11 - i);
+    rev = 11 - (sum % 11);
+    if (rev === 10 || rev === 11) rev = 0;
+    return rev === parseInt(digits[10], 10);
+}
+
+function normalizePixKeyForBrCode(rawKey) {
+    const raw = String(rawKey || "").trim();
+    if (!raw) return "";
+    if (raw.includes("@")) return raw.toLowerCase();
+    if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(raw)) {
+        return raw.toLowerCase();
+    }
+    const digits = raw.replace(/\D/g, "");
+    if (raw.startsWith("+") || /\(\d{2}\)/.test(raw)) {
+        const cleanPhone = digits.replace(/^0+/, "");
+        if (cleanPhone.length === 10 || cleanPhone.length === 11) return `+55${cleanPhone}`;
+        return `+${cleanPhone}`;
+    }
+    if (digits.length === 14) return digits; // CNPJ
+    if (digits.length === 11) {
+        if (/\d{3}\.\d{3}\.\d{3}-\d{2}/.test(raw) || isValidCpfChecksum(digits)) {
+            return digits; // CPF
+        }
+        return `+55${digits}`; // Celular com DDD
+    }
+    if (digits.length === 10) return `+55${digits}`;
+    return raw;
+}
+
+function sanitizePixFieldText(str, maxLen, fallback) {
+    const clean = String(str || fallback || "")
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/[^a-zA-Z0-9 ]/g, " ")
+        .replace(/\s+/g, " ")
+        .trim()
+        .toUpperCase();
+    return (clean || fallback).slice(0, maxLen);
+}
+
+function emvField(id, value) {
+    const str = String(value ?? "");
+    const len = String(str.length).padStart(2, "0");
+    return `${id}${len}${str}`;
+}
+
+function computePixCRC16(payloadWith6304) {
+    let crc = 0xFFFF;
+    for (let i = 0; i < payloadWith6304.length; i++) {
+        crc ^= (payloadWith6304.charCodeAt(i) & 0xFF) << 8;
+        for (let j = 0; j < 8; j++) {
+            if ((crc & 0x8000) !== 0) {
+                crc = ((crc << 1) ^ 0x1021) & 0xFFFF;
+            } else {
+                crc = (crc << 1) & 0xFFFF;
+            }
+        }
+    }
+    return crc.toString(16).toUpperCase().padStart(4, "0");
+}
+
+export function generatePixBrCodePayload({ chavePix, nomeFavorecido, enderecoOuCidade, valor, txid }) {
+    const key = normalizePixKeyForBrCode(chavePix);
+    if (!key) return "";
+
+    const merchantAccount = emvField("00", "br.gov.bcb.pix") + emvField("01", key);
+    const merchantName = sanitizePixFieldText(nomeFavorecido, 25, "GRANJA RANCHO DO VIANA");
+
+    // Extrai cidade do endereço se disponível (ex: "Sítio Ximendes - União dos Palmares - AL")
+    let rawCity = "UNIAO PALMARES";
+    if (enderecoOuCidade) {
+        const parts = String(enderecoOuCidade).split(/[-–,/]/).map(s => s.trim()).filter(s => s.length > 2);
+        if (parts.length >= 2) {
+            const candidate = parts[parts.length - 1].length === 2 ? parts[parts.length - 2] : parts[parts.length - 1];
+            if (candidate) rawCity = candidate;
+        }
+    }
+    const merchantCity = sanitizePixFieldText(rawCity, 15, "UNIAO PALMARES");
+
+    const numAmount = Number(valor) || 0;
+    const amountField = numAmount > 0 ? emvField("54", numAmount.toFixed(2)) : "";
+    const cleanTxid = String(txid || "***").replace(/[^a-zA-Z0-9]/g, "").slice(0, 25) || "***";
+    const additionalData = emvField("62", emvField("05", cleanTxid));
+
+    const payloadBase =
+        emvField("00", "01") +
+        emvField("26", merchantAccount) +
+        emvField("52", "0000") +
+        emvField("53", "986") +
+        amountField +
+        emvField("58", "BR") +
+        emvField("59", merchantName) +
+        emvField("60", merchantCity) +
+        additionalData +
+        "6304";
+
+    return payloadBase + computePixCRC16(payloadBase);
+}
+
+function buildPixQrCodeImageTag(pixPayload, compact = false) {
+    if (!pixPayload) return "";
+    const sizePx = compact ? 74 : 92;
+    if (typeof window.qrcode === "function") {
+        try {
+            const qr = window.qrcode(0, "M");
+            qr.addData(pixPayload);
+            qr.make();
+            const dataUrl = qr.createDataURL(4, 1);
+            return `<img src="${dataUrl}" alt="QR Code Pix" class="inv-pix-qr-img" width="${sizePx}" height="${sizePx}">`;
+        } catch (err) {
+            console.warn("Erro ao gerar imagem QR Pix local:", err);
+        }
+    }
+    const fallbackUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&margin=4&data=${encodeURIComponent(pixPayload)}`;
+    return `<img src="${fallbackUrl}" crossorigin="anonymous" alt="QR Code Pix" class="inv-pix-qr-img" width="${sizePx}" height="${sizePx}">`;
+}
+
 function buildSingleInvoiceHtml(sale, copyLabel = "", compact = false) {
     const emp = getEmpresaConfig();
     const { db } = state;
@@ -471,6 +606,18 @@ function buildSingleInvoiceHtml(sale, copyLabel = "", compact = false) {
     const textoDeclaracao = isPago
         ? `Declaramos que recebemos de <strong>${esc(clienteNome)}</strong> a importância líquida de <strong>${money(valorTotal)}</strong> referente aos produtos discriminados neste documento, dando plena e rasa quitação.`
         : `Fatura emitida para <strong>${esc(clienteNome)}</strong> no valor líquido de <strong>${money(valorTotal)}</strong>, encontrando-se <strong>PENDENTE DE PAGAMENTO</strong> até a presente data.`;
+
+    const favorecidoPixNome = emp.favorecidoPix || emp.responsavel || emp.nome || DEFAULT_EMPRESA.nome;
+    const pixPayload = emp.chavePix
+        ? generatePixBrCodePayload({
+            chavePix: emp.chavePix,
+            nomeFavorecido: favorecidoPixNome,
+            enderecoOuCidade: emp.endereco,
+            valor: valorTotal,
+            txid: `RECIBO${numRecibo}`
+        })
+        : "";
+    const pixQrImgHtml = pixPayload ? buildPixQrCodeImageTag(pixPayload, compact) : "";
 
     return `
         <div class="a4-invoice-sheet ${compact ? 'is-compact' : ''}">
@@ -560,10 +707,26 @@ function buildSingleInvoiceHtml(sale, copyLabel = "", compact = false) {
                     </div>
                     ${emp.chavePix ? `
                     <div class="inv-pix-box">
-                        <span class="inv-pix-badge">PIX</span>
-                        <div>
-                            <strong>Chave Pix para Pagamento:</strong> ${esc(emp.chavePix)}
-                            ${(emp.favorecidoPix || emp.responsavel || emp.nome) ? `<small style="display:block; color:#475569;">Favorecido: ${esc(emp.favorecidoPix || emp.responsavel || emp.nome)}</small>` : ""}
+                        ${pixQrImgHtml ? `
+                        <div class="inv-pix-qr-wrap">
+                            ${pixQrImgHtml}
+                            <span class="inv-pix-qr-caption">Pagar ${money(valorTotal)}</span>
+                        </div>
+                        ` : ""}
+                        <div class="inv-pix-info">
+                            <div style="display:flex; align-items:center; gap:6px; margin-bottom:3px;">
+                                <span class="inv-pix-badge">PIX</span>
+                                <strong style="font-size:11.5px; color:#065f46;">Pagamento via QR Code ou Chave Pix</strong>
+                            </div>
+                            <div style="font-size:12px; color:#064e3b; word-break:break-all;">
+                                <strong>Chave:</strong> ${esc(emp.chavePix)}
+                            </div>
+                            <small style="display:block; color:#475569; margin-top:2px;">
+                                <strong>Favorecido:</strong> ${esc(favorecidoPixNome)} &bull; <strong>Valor:</strong> ${money(valorTotal)}
+                            </small>
+                            <small style="display:block; color:#059669; font-size:10px; margin-top:2px; font-weight:600;">
+                                Abra o app do seu banco e escaneie o QR Code ao lado com o valor já preenchido.
+                            </small>
                         </div>
                     </div>
                     ` : ""}
@@ -897,13 +1060,44 @@ export function getInvoiceStyles(mode = "single", forPdf = false) {
         .inv-pix-box {
             display: flex;
             align-items: center;
-            gap: 10px;
+            gap: 12px;
             background: #ecfdf5;
-            border: 1px dashed #10b981;
-            border-radius: 8px;
-            padding: 8px 12px;
+            border: 1.5px dashed #10b981;
+            border-radius: 10px;
+            padding: 10px 12px;
             font-size: 12px;
             color: #065f46;
+        }
+        .inv-pix-qr-wrap {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background: #ffffff;
+            border: 1px solid #a7f3d0;
+            border-radius: 8px;
+            padding: 5px;
+            flex-shrink: 0;
+            box-shadow: 0 2px 6px rgba(5, 150, 105, 0.08);
+        }
+        .inv-pix-qr-img {
+            display: block;
+            border-radius: 4px;
+            image-rendering: pixelated;
+        }
+        .inv-pix-qr-caption {
+            font-size: 9px;
+            font-weight: 800;
+            color: #047857;
+            margin-top: 3px;
+            text-transform: uppercase;
+            letter-spacing: 0.02em;
+            white-space: nowrap;
+        }
+        .inv-pix-info {
+            flex: 1;
+            min-width: 0;
+            line-height: 1.35;
         }
         .inv-pix-badge {
             background: #059669;
@@ -1240,11 +1434,12 @@ async function checkIsWhatsappApiReady() {
     if (!emp.whatsappApiProvider) return false;
     if (emp.whatsappApiProvider !== "proprio") return true;
 
-    const baseUrl = String(emp.whatsappApiUrl || "http://localhost:3001").replace(/\/+$/, "");
+    const rawUrl = String(emp.whatsappApiUrl || "").trim();
+    const baseUrl = ((!rawUrl || rawUrl === "http://localhost:3001") ? "https://granja-bykk.onrender.com" : rawUrl).replace(/\/+$/, "");
     try {
         if (!shouldUseSupabaseBridgeOnly(baseUrl)) {
             const ctrl = new AbortController();
-            const timer = setTimeout(() => ctrl.abort(), 1800);
+            const timer = setTimeout(() => ctrl.abort(), 8000);
             const res = await fetch(`${baseUrl}/status`, { method: "GET", signal: ctrl.signal });
             clearTimeout(timer);
             const data = await res.json();
@@ -1321,6 +1516,9 @@ function loadExternalScript(src) {
 }
 
 async function ensurePdfLibsLoaded() {
+    if (typeof window.qrcode !== "function") {
+        await loadExternalScript("https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js");
+    }
     if (typeof window.html2canvas !== "function") {
         await loadExternalScript("https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js");
     }
@@ -1523,7 +1721,7 @@ async function sendPdfViaWhatsappApi({ emp, phoneDDI, clienteNome, pdfBlob, file
     let body = {};
 
     if (provider === "proprio") {
-        const targetUrl = baseUrl || "http://localhost:3001";
+        const targetUrl = (!baseUrl || baseUrl === "http://localhost:3001") ? "https://granja-bykk.onrender.com" : baseUrl;
         const payload = {
             phone: phoneDDI,
             clientName: clienteNome,
@@ -1641,6 +1839,157 @@ async function sendPdfViaWhatsappApi({ emp, phoneDDI, clienteNome, pdfBlob, file
     }
 
     return true;
+}
+
+export async function autoSendNewSaleReceiptWhatsApp(sale, alertasInsumos = []) {
+    if (!sale || sale.tipo !== "VENDA") return;
+
+    const emp = getEmpresaConfig();
+    const { db } = state;
+    const clienteNome = sale.cliente || "Consumidor Geral";
+    const clienteCad = (db.clientes || []).find(
+        c => (sale.cliente_id && String(c.id) === String(sale.cliente_id)) ||
+             String(c.nome || "").trim().toLowerCase() === String(clienteNome).trim().toLowerCase()
+    );
+
+    const rawPhone = clienteCad?.telefone || "";
+    const phoneDDI = normalizeWhatsappNumber(rawPhone);
+    const alertaStr = alertasInsumos.length > 0 ? ` (⚠️ ${alertasInsumos.join(" · ")})` : "";
+
+    if (!phoneDDI) {
+        if (clienteNome && clienteNome !== "Consumidor Geral") {
+            toast(`Venda salva! Cliente sem WhatsApp cadastrado — abrindo recibo...${alertaStr}`);
+            openSaleReceipt(sale.id);
+        } else {
+            toast(`Venda registrada e estoques atualizados!${alertaStr}`);
+        }
+        return;
+    }
+
+    if (!emp.whatsappApiProvider) {
+        toast(`Venda registrada! Toque em 'Enviar PDF' para enviar ao WhatsApp de ${clienteNome}.${alertaStr}`);
+        openSaleReceipt(sale.id);
+        return;
+    }
+
+    const isPago = String(sale.status || "pago").toLowerCase() === "pago";
+    const nomeEmpresa = emp.nome || DEFAULT_EMPRESA.nome;
+    const rodapeAgradecimento = emp.mensagemRodape || DEFAULT_EMPRESA.mensagemRodape;
+    const msgVenda = isPago
+        ? `Olá, *${clienteNome}*! Segue o recibo referente à sua compra na *${nomeEmpresa}*.\n\n${rodapeAgradecimento}`
+        : `Olá, *${clienteNome}*! Segue o recibo referente à sua compra na *${nomeEmpresa}* (o QR Code Pix para pagamento encontra-se no recibo).\n\n${rodapeAgradecimento}`;
+
+    toast(`Venda salva! Gerando e enviando recibo em PDF para ${clienteNome}...${alertaStr}`);
+
+    try {
+        const apiReady = await checkIsWhatsappApiReady();
+        if (!apiReady) {
+            toast(`Venda salva! Toque em 'Enviar PDF' para encaminhar o recibo a ${clienteNome}.${alertaStr}`);
+            openSaleReceipt(sale.id);
+            return;
+        }
+
+        const pdfData = await generateReceiptPdfFile(sale, "single");
+        cachedReceiptPdf = {
+            saleId: Number(sale.id),
+            mode: "single",
+            apiServerReady: true,
+            ...pdfData
+        };
+
+        await sendPdfViaWhatsappApi({
+            emp,
+            phoneDDI,
+            clienteNome,
+            pdfBlob: pdfData.pdfBlob,
+            fileName: pdfData.fileName,
+            caption: msgVenda
+        });
+
+        registrarLog({
+            acao: "INCLUSAO",
+            modulo: "VENDAS",
+            resumo: `Recibo de nova venda em PDF (${pdfData.fileName}) enviado automaticamente via WhatsApp para ${clienteNome} (${clienteCad?.telefone || phoneDDI})`,
+            detalhes: { vendaId: sale.id, cliente: clienteNome, telefone: phoneDDI, arquivo: pdfData.fileName, status: sale.status }
+        });
+
+        toast(`✅ Venda salva e recibo em PDF enviado para o WhatsApp de ${clienteNome}!${alertaStr}`);
+    } catch (err) {
+        console.warn("Aviso no envio automático do recibo da nova venda:", err);
+        toast(`Venda salva! Toque em 'Enviar PDF' no recibo para enviar a ${clienteNome}.${alertaStr}`);
+        openSaleReceipt(sale.id);
+    }
+}
+
+export async function autoSendPaidReceiptWhatsApp(sale) {
+    if (!sale || sale.tipo !== "VENDA") return;
+
+    const emp = getEmpresaConfig();
+    const { db } = state;
+    const clienteNome = sale.cliente || "Consumidor Geral";
+    const clienteCad = (db.clientes || []).find(
+        c => (sale.cliente_id && String(c.id) === String(sale.cliente_id)) ||
+             String(c.nome || "").trim().toLowerCase() === String(clienteNome).trim().toLowerCase()
+    );
+
+    const rawPhone = clienteCad?.telefone || "";
+    const phoneDDI = normalizeWhatsappNumber(rawPhone);
+
+    // Limpa cache anterior desse recibo para forçar geração com status PAGO atualizado
+    if (cachedReceiptPdf && cachedReceiptPdf.saleId === Number(sale.id)) {
+        cachedReceiptPdf = null;
+    }
+
+    if (!emp.whatsappApiProvider || !phoneDDI) {
+        toast("Status alterado para PAGO! Abrindo recibo quitado para envio...");
+        openSaleReceipt(sale.id);
+        return;
+    }
+
+    const nomeEmpresa = emp.nome || DEFAULT_EMPRESA.nome;
+    const rodapeAgradecimento = emp.mensagemRodape || DEFAULT_EMPRESA.mensagemRodape;
+    const msgQuitacao = `Olá, *${clienteNome}*! Confirmamos o recebimento do seu pagamento na *${nomeEmpresa}*. ✅\n\nSegue em anexo o seu *Recibo Atualizado (PAGO / QUITADO)*.\n\n${rodapeAgradecimento}`;
+
+    toast(`Status PAGO! Gerando e enviando recibo quitado para ${clienteNome}...`);
+
+    try {
+        const apiReady = await checkIsWhatsappApiReady();
+        if (!apiReady) {
+            toast("Status salvo como PAGO! Toque em 'Enviar PDF' para encaminhar o recibo quitado.");
+            openSaleReceipt(sale.id);
+            return;
+        }
+
+        const pdfData = await generateReceiptPdfFile(sale, "single");
+        cachedReceiptPdf = {
+            saleId: Number(sale.id),
+            mode: "single",
+            apiServerReady: true,
+            ...pdfData
+        };
+
+        await sendPdfViaWhatsappApi({
+            emp,
+            phoneDDI,
+            clienteNome,
+            pdfBlob: pdfData.pdfBlob,
+            fileName: pdfData.fileName,
+            caption: msgQuitacao
+        });
+
+        registrarLog({
+            acao: "INCLUSAO",
+            modulo: "VENDAS",
+            resumo: `Recibo QUITADO em PDF (${pdfData.fileName}) enviado automaticamente via WhatsApp para ${clienteNome} (${clienteCad?.telefone || phoneDDI})`,
+            detalhes: { vendaId: sale.id, cliente: clienteNome, telefone: phoneDDI, arquivo: pdfData.fileName, status: "pago" }
+        });
+
+        toast(`✅ Recibo PAGO enviado automaticamente para o WhatsApp de ${clienteNome}!`);
+    } catch (err) {
+        console.warn("Aviso no envio automático do recibo pago:", err);
+        toast("Venda marcada como PAGA! Toque em 'Enviar PDF' no recibo para enviar ao cliente.");
+        openSaleReceipt(sale.id);
+    }
 }
 
 export async function sendSaleReceiptWhatsApp() {

@@ -14,13 +14,20 @@ import {
 } from '../utils/formatters.js';
 import { iconSvg, deleteIcon, toast } from '../utils/icons.js';
 
+function getClientesOrdenados() {
+    return [...(state.db?.clientes || [])].sort((a, b) =>
+        String(a?.nome || "").trim().localeCompare(String(b?.nome || "").trim(), "pt-BR", { sensitivity: "base" })
+    );
+}
+
 export function renderSelects() {
     const { db } = state;
+    const clientesOrdenados = getClientesOrdenados();
 
     const clients = document.getElementById("saleClient");
     if (clients) {
         clients.innerHTML = '<option value="">Consumidor Geral</option>' +
-            db.clientes.map(c => `<option value="${esc(c.nome)}">${esc(c.nome)}</option>`).join("");
+            clientesOrdenados.map(c => `<option value="${esc(c.nome)}">${esc(c.nome)}</option>`).join("");
     }
 
     const products = document.getElementById("saleProduct");
@@ -50,7 +57,8 @@ export function renderLists() {
 export function renderClients() {
     const list = document.getElementById("clientList");
     if (!list) return;
-    list.innerHTML = state.db.clientes.map(c => `
+    const clientesOrdenados = getClientesOrdenados();
+    list.innerHTML = clientesOrdenados.map(c => `
         <div class="item">
             <div style="display: flex; flex-direction: column; align-items: flex-start;">
                 <b style="font-size: 1.1rem;">${esc(c.nome)}</b>
