@@ -24,6 +24,7 @@ import {
 import {
     renderStock,
     renderPlantel,
+    previewPlantelConsumo,
     saveGalinhas,
     processarConsumoRacao
 } from './domain/estoque.js';
@@ -42,6 +43,9 @@ import {
 import {
     renderSelects,
     renderLists,
+    renderClients,
+    renderProducts,
+    renderInsumos,
     openCompositionModal,
     closeCompositionModal,
     updateCompositionSummary,
@@ -162,6 +166,7 @@ function bindForms() {
     document.getElementById("productionForm")?.addEventListener("submit", handleProduction);
     document.getElementById("modalProductionForm")?.addEventListener("submit", handleModalProduction);
     document.getElementById("expenseForm")?.addEventListener("submit", handleExpense);
+    document.getElementById("plantelForm")?.addEventListener("submit", saveGalinhas);
     document.getElementById("insumoForm")?.addEventListener("submit", handleInsumo);
     document.getElementById("insumoEditForm")?.addEventListener("submit", handleInsumoEdit);
     document.getElementById("clientForm")?.addEventListener("submit", handleClient);
@@ -217,6 +222,9 @@ Object.assign(window, {
     openCompositionModal,
     closeCompositionModal,
     updateCompositionSummary,
+    renderClients,
+    renderProducts,
+    renderInsumos,
     openProductEditModal,
     closeProductEditModal,
     openClientEditModal,
@@ -233,6 +241,7 @@ Object.assign(window, {
     handlePhotoUpload,
     confirmCrop,
     cancelCrop,
+    previewPlantelConsumo,
     saveGalinhas,
     toggleUnitIndicator,
     toggleEditUnitIndicator,

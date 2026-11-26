@@ -57,13 +57,33 @@ export function renderLists() {
 export function renderClients() {
     const list = document.getElementById("clientList");
     if (!list) return;
-    const clientesOrdenados = getClientesOrdenados();
-    list.innerHTML = clientesOrdenados.map(c => `
+    const countEl = document.getElementById("clientListCount");
+    const term = (document.getElementById("searchClientInput")?.value || "").trim().toLowerCase();
+
+    const todos = getClientesOrdenados();
+    const filtrados = term
+        ? todos.filter(c =>
+            String(c.nome || "").toLowerCase().includes(term) ||
+            String(c.cidade || "").toLowerCase().includes(term) ||
+            String(c.telefone || "").toLowerCase().includes(term)
+        )
+        : todos;
+
+    if (countEl) {
+        countEl.textContent = `${filtrados.length} ${filtrados.length === 1 ? "cliente" : "clientes"}`;
+    }
+
+    if (filtrados.length === 0) {
+        list.innerHTML = `<div class="cadastro-empty-list"><i class="fas fa-user-slash"></i><span>${term ? "Nenhum cliente encontrado para a busca." : "Nenhum cliente cadastrado ainda."}</span></div>`;
+        return;
+    }
+
+    list.innerHTML = filtrados.map(c => `
         <div class="item">
             <div style="display: flex; flex-direction: column; align-items: flex-start;">
-                <b style="font-size: 1.1rem;">${esc(c.nome)}</b>
+                <b style="font-size: 1.05rem;">${esc(c.nome)}</b>
                 <small style="color: var(--muted); margin-top: 2px;">
-                    ${esc([c.telefone, c.cidade].filter(Boolean).join(" · "))}
+                    ${esc([c.telefone, c.cidade].filter(Boolean).join(" · ") || "Sem telefone/cidade")}
                 </small>
             </div>
             <div style="display: flex; gap: 8px;">
@@ -82,8 +102,26 @@ export function renderProducts() {
     const list = document.getElementById("productList");
     if (!list) return;
     const { db } = state;
+    const countEl = document.getElementById("productListCount");
+    const term = (document.getElementById("searchProductInput")?.value || "").trim().toLowerCase();
 
-    list.innerHTML = db.produtos.map(p => {
+    const filtrados = term
+        ? (db.produtos || []).filter(p =>
+            String(p.nome || "").toLowerCase().includes(term) ||
+            String(p.tipoOvo || "").toLowerCase().includes(term)
+        )
+        : (db.produtos || []);
+
+    if (countEl) {
+        countEl.textContent = `${filtrados.length} ${filtrados.length === 1 ? "produto" : "produtos"}`;
+    }
+
+    if (filtrados.length === 0) {
+        list.innerHTML = `<div class="cadastro-empty-list"><i class="fas fa-box-open"></i><span>${term ? "Nenhum produto encontrado para a busca." : "Nenhum produto cadastrado ainda."}</span></div>`;
+        return;
+    }
+
+    list.innerHTML = filtrados.map(p => {
         let compHtml = "";
         if (p.composicao && p.composicao.length > 0) {
             const items = p.composicao.map(c => {
@@ -100,7 +138,7 @@ export function renderProducts() {
         return `
         <div class="item">
             <div style="display: flex; flex-direction: column; align-items: flex-start; width: 100%;">
-                <b style="font-size: 1.1rem;">${esc(p.nome)}</b>
+                <b style="font-size: 1.05rem;">${esc(p.nome)}</b>
                 <small style="color: var(--muted); margin-top: 2px;">
                     ${esc(p.tipoOvo)} · ${p.ovosPorItem || 0} ovos · Unit.: ${money(p.preco)}
                 </small>
@@ -121,7 +159,26 @@ export function renderProducts() {
 export function renderInsumos() {
     const list = document.getElementById("insumoList");
     if (!list) return;
-    list.innerHTML = state.db.insumos.map(ins => {
+    const countEl = document.getElementById("insumoListCount");
+    const term = (document.getElementById("searchInsumoInput")?.value || "").trim().toLowerCase();
+
+    const filtrados = term
+        ? (state.db.insumos || []).filter(ins =>
+            String(ins.nome || "").toLowerCase().includes(term) ||
+            String(getPhaseLabel(ins.tipoConsumo) || "").toLowerCase().includes(term)
+        )
+        : (state.db.insumos || []);
+
+    if (countEl) {
+        countEl.textContent = `${filtrados.length} ${filtrados.length === 1 ? "insumo" : "insumos"}`;
+    }
+
+    if (filtrados.length === 0) {
+        list.innerHTML = `<div class="cadastro-empty-list"><i class="fas fa-warehouse"></i><span>${term ? "Nenhum insumo encontrado para a busca." : "Nenhum insumo cadastrado ainda."}</span></div>`;
+        return;
+    }
+
+    list.innerHTML = filtrados.map(ins => {
         const qtd = Number(ins.qtd) || 0;
         let statusBadge = "";
         if (!isRacao(ins)) {
@@ -135,7 +192,7 @@ export function renderInsumos() {
         <div class="item">
             <div style="display: flex; flex-direction: column; align-items: flex-start;">
                 <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
-                    <b style="font-size: 1.1rem;">${esc(ins.nome)}</b>
+                    <b style="font-size: 1.05rem;">${esc(ins.nome)}</b>
                     ${statusBadge}
                 </div>
                 <small style="color: var(--muted); margin-top: 2px;">

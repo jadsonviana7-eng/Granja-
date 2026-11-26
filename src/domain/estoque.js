@@ -120,21 +120,24 @@ export function renderStock() {
     }
 }
 
-export function renderPlantel() {
-    const { db } = state;
+function updatePlantelSummaryDOM(valores, syncInputs = false) {
     let htmlFases = "";
     let totalAves = 0;
     let consumoTotalGeral = 0;
 
     Object.entries(FEED_PHASES).forEach(([fase, config]) => {
-        const qtdAves = Number(db.config.plantel[fase]) || 0;
+        const qtdAves = Math.max(0, Number(valores[fase]) || 0);
         const consumoFase = qtdAves * config.consumoKgDia;
 
         totalAves += qtdAves;
         consumoTotalGeral += consumoFase;
 
-        const input = document.querySelector(`.plantel-input[data-fase="${fase}"]`);
-        if (input) input.value = qtdAves;
+        if (syncInputs) {
+            const input = document.querySelector(`.plantel-input[data-fase="${fase}"]`);
+            if (input && document.activeElement !== input) {
+                input.value = qtdAves;
+            }
+        }
 
         htmlFases += `
             <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px dashed var(--line);">
@@ -156,6 +159,18 @@ export function renderPlantel() {
     if (detalheConsumoEl) detalheConsumoEl.innerHTML = htmlFases;
 }
 
+export function renderPlantel() {
+    updatePlantelSummaryDOM(state.db?.config?.plantel || {}, true);
+}
+
+export function previewPlantelConsumo() {
+    const valores = {};
+    document.querySelectorAll(".plantel-input").forEach(input => {
+        valores[input.dataset.fase] = parseInt(input.value, 10) || 0;
+    });
+    updatePlantelSummaryDOM(valores, false);
+}
+
 export function getConsumoDiarioTotal() {
     const { db } = state;
     return Object.entries(FEED_PHASES).reduce((acc, [fase, config]) => (
@@ -163,31 +178,94 @@ export function getConsumoDiarioTotal() {
     ), 0);
 }
 
-export function saveGalinhas() {
+export async function saveGalinhas(e) {
+    if (e && typeof e.preventDefault === "function") e.preventDefault();
     if (!isCurrentUserAdmin()) {
         renderPlantel();
         return toast("Apenas administradores podem alterar o plantel.");
     }
+
     const { db } = state;
+    const novosValores = {};
     document.querySelectorAll(".plantel-input").forEach(input => {
         const fase = input.dataset.fase;
-        const qtd = Math.max(0, parseInt(input.value, 10) || 0);
-        db.config.plantel[fase] = qtd;
+        novosValores[fase] = Math.max(0, parseInt(input.value, 10) || 0);
+    });
 
+    const btn = document.getElementById("btnSavePlantel");
+    const originalHtml = btn ? btn.innerHTML : "";
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Salvando no Supabase...`;
+    }
+
+    let dbErrorMsg = "";
+    try {
         if (supabaseClient) {
-            supabaseClient.from('plantel').upsert({ fase, quantidade_aves: qtd }, { onConflict: 'fase' })
-                .then(({ error }) => { if (error) console.error("Erro ao salvar fase " + fase + ":", error); });
-        }
-    });
+            const { data: rowsExistentes, error: selErr } = await supabaseClient
+                .from('plantel')
+                .select('id, fase');
 
-    save();
-    registrarLog({
-        acao: "EDICAO",
-        modulo: "PLANTEL",
-        resumo: `Configuração do plantel atualizada`,
-        detalhes: { ...db.config.plantel }
-    });
-    toast("Plantel atualizado!");
+            if (selErr) {
+                dbErrorMsg = selErr.message;
+            } else {
+                const existingMap = {};
+                let maxId = 0;
+                (rowsExistentes || []).forEach(r => {
+                    const numId = Number(r.id) || 0;
+                    if (numId > maxId) maxId = numId;
+                    existingMap[String(r.fase || "").trim().toLowerCase()] = r;
+                });
+
+                let nextId = maxId > 0 ? maxId + 1 : Date.now();
+
+                for (const [fase, qtd] of Object.entries(novosValores)) {
+                    const rowExistente = existingMap[fase.toLowerCase()];
+                    if (rowExistente) {
+                        const { error: updErr } = await supabaseClient
+                            .from('plantel')
+                            .update({ quantidade_aves: qtd })
+                            .eq('id', rowExistente.id);
+                        if (updErr) {
+                            dbErrorMsg = updErr.message;
+                            console.error("Erro ao atualizar fase " + fase + ":", updErr);
+                        }
+                    } else {
+                        const { error: insErr } = await supabaseClient
+                            .from('plantel')
+                            .insert({ id: nextId++, fase, quantidade_aves: qtd });
+                        if (insErr) {
+                            dbErrorMsg = insErr.message;
+                            console.error("Erro ao inserir fase " + fase + ":", insErr);
+                        }
+                    }
+                }
+            }
+        }
+
+        Object.entries(novosValores).forEach(([fase, qtd]) => {
+            db.config.plantel[fase] = qtd;
+        });
+
+        save();
+        registrarLog({
+            acao: "EDICAO",
+            modulo: "PLANTEL",
+            resumo: `Configuração do plantel atualizada (${Object.values(novosValores).reduce((a, b) => a + b, 0)} aves no total)`,
+            detalhes: { ...db.config.plantel }
+        });
+
+        if (dbErrorMsg) {
+            toast("Salvo localmente, mas houve erro no Supabase: " + dbErrorMsg);
+        } else {
+            toast("Quantidades do plantel salvas no Supabase com sucesso!");
+        }
+    } finally {
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = originalHtml;
+        }
+    }
 }
 
 export async function processarConsumoRacao() {

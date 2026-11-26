@@ -1,5 +1,5 @@
 import { TABS } from '../config/constants.js';
-import { isCurrentUserAdmin } from '../state/store.js';
+import { state, isCurrentUserAdmin } from '../state/store.js';
 import { renderInsumosNoProduto } from '../domain/cadastros.js';
 import { renderPlantel } from '../domain/estoque.js';
 import { esc } from '../utils/formatters.js';
@@ -76,9 +76,10 @@ export function setupPwaInstallButton() {
 
 export function switchSubCadastro(id, btn) {
     document.querySelectorAll('.sub-page-cadastro').forEach(p => p.classList.remove('active'));
-    document.querySelectorAll('.sub-tab').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.sub-tab, .cadastro-side-btn').forEach(b => b.classList.remove('active'));
 
     document.getElementById(id)?.classList.add('active');
+    document.querySelectorAll(`[data-subtarget="${id}"]`).forEach(el => el.classList.add('active'));
     btn?.classList.add('active');
 }
 
@@ -96,12 +97,37 @@ export function switchSubConfig(id, btn) {
 
 export function renderSubTabsIcons() {
     document.querySelectorAll('.sub-tab').forEach(btn => {
+        if (btn.dataset.iconRendered) return;
         const iconName = btn.dataset.icon;
         if (iconName) {
             const label = btn.textContent.trim();
             btn.innerHTML = `${iconSvg(iconName)}<span>${esc(label)}</span>`;
+            btn.dataset.iconRendered = "true";
         }
     });
+
+    document.querySelectorAll('.cadastro-side-btn').forEach(btn => {
+        if (btn.dataset.iconRendered) return;
+        const iconName = btn.dataset.icon;
+        const iconSlot = btn.querySelector('.side-btn-icon');
+        if (iconName && iconSlot) {
+            iconSlot.innerHTML = iconSvg(iconName);
+            btn.dataset.iconRendered = "true";
+        }
+    });
+
+    const db = state.db;
+    if (db) {
+        const totalAves = Object.values(db.config?.plantel || {}).reduce((acc, q) => acc + (Number(q) || 0), 0);
+        const setCount = (id, val) => {
+            const el = document.getElementById(id);
+            if (el) el.textContent = val;
+        };
+        setCount('sideCountPlantel', totalAves);
+        setCount('sideCountClientes', (db.clientes || []).length);
+        setCount('sideCountProdutos', (db.produtos || []).length);
+        setCount('sideCountInsumos', (db.insumos || []).length);
+    }
 }
 
 export function decorateCardHeaders() {

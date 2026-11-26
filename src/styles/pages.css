@@ -1006,7 +1006,228 @@ canvas {
     display: none;
 }
 
+.cadastro-layout {
+    display: grid;
+    grid-template-columns: 260px minmax(0, 1fr);
+    gap: 18px;
+    align-items: start;
+}
+
+.cadastro-sidebar {
+    position: sticky;
+    top: 18px;
+    padding: 16px;
+    margin-bottom: 0;
+}
+
+.cadastro-sidebar-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.76rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--muted);
+    padding: 0 4px 12px;
+    margin-bottom: 10px;
+    border-bottom: 1px solid var(--line);
+}
+
+.cadastro-sidebar-nav {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.cadastro-side-btn {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 11px 12px;
+    border-radius: 12px;
+    border: 1px solid transparent;
+    background: transparent;
+    text-align: left;
+    color: var(--ink-soft);
+    transition: all 0.18s ease;
+}
+
+.cadastro-side-btn:hover {
+    background: var(--surface-2);
+    border-color: var(--line);
+    color: var(--ink);
+}
+
+.cadastro-side-btn.active {
+    background: var(--green-soft);
+    border-color: rgba(27, 122, 67, 0.25);
+    color: var(--green);
+    box-shadow: 0 3px 10px rgba(27, 122, 67, 0.08);
+}
+
+.side-btn-left {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+}
+
+.side-btn-icon {
+    width: 34px;
+    height: 34px;
+    border-radius: 10px;
+    background: var(--surface-2);
+    border: 1px solid var(--line);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--muted);
+    flex-shrink: 0;
+    transition: all 0.18s ease;
+}
+
+.side-btn-icon svg {
+    width: 18px !important;
+    height: 18px !important;
+}
+
+.cadastro-side-btn.active .side-btn-icon {
+    background: var(--green);
+    border-color: var(--green);
+    color: #ffffff;
+}
+
+.side-btn-text {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.side-btn-text strong {
+    font-size: 0.9rem;
+    font-weight: 800;
+    line-height: 1.2;
+}
+
+.side-btn-text small {
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: var(--muted);
+    margin-top: 1px;
+}
+
+.side-btn-count {
+    font-size: 0.72rem;
+    font-weight: 800;
+    padding: 3px 8px;
+    border-radius: 999px;
+    background: var(--surface-2);
+    color: var(--muted);
+    border: 1px solid var(--line);
+    flex-shrink: 0;
+}
+
+.cadastro-side-btn.active .side-btn-count {
+    background: #ffffff;
+    color: var(--green);
+    border-color: rgba(27, 122, 67, 0.25);
+}
+
+.cadastro-tabs-container {
+    min-width: 0;
+}
+
+.cadastro-section-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+}
+
+.cadastro-form-card {
+    margin-bottom: 0;
+    border-top: 3px solid var(--green);
+}
+
+.cadastro-list-card {
+    margin-bottom: 0;
+    border-top: 3px solid var(--blue);
+}
+
+.cadastro-list-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.cadastro-search-wrap {
+    position: relative;
+    margin-bottom: 14px;
+}
+
+.cadastro-search-wrap i {
+    position: absolute;
+    left: 13px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--muted);
+    font-size: 0.85rem;
+    pointer-events: none;
+}
+
+.cadastro-search-wrap input {
+    padding-left: 36px;
+    min-height: 40px;
+    background: var(--surface-2);
+    border-color: var(--line);
+    font-size: 0.86rem;
+}
+
+.cadastro-search-wrap input:focus {
+    background: #ffffff;
+}
+
+.cadastro-empty-list {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 28px 16px;
+    border: 1.5px dashed var(--line);
+    border-radius: 12px;
+    background: var(--surface-2);
+    color: var(--muted);
+    font-size: 0.86rem;
+    font-weight: 600;
+    text-align: center;
+}
+
+.cadastro-empty-list i {
+    font-size: 1.4rem;
+    color: #94a3b8;
+}
+
+.sub-page-cadastro {
+    display: none;
+    animation: fadeInPage 0.2s ease;
+}
+
+.sub-page-cadastro.active {
+    display: block;
+}
+
 @media (max-width: 820px) {
+    .cadastro-layout {
+        grid-template-columns: 1fr;
+    }
+    .cadastro-sidebar {
+        display: none;
+    }
     .sub-tabs-cadastro {
         display: grid;
         grid-template-columns: repeat(4, 1fr);
@@ -1042,12 +1263,6 @@ canvas {
         color: var(--green);
         background: var(--green-soft);
     }
-    .sub-page-cadastro { display: none; }
-    .sub-page-cadastro.active { display: block; }
-}
-
-@media (min-width: 821px) {
-    .sub-page-cadastro { display: block !important; }
 }
 
 /* ─── Sub-abas da Página de Ajustes (Empresa vs Usuários) ─── */

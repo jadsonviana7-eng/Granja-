@@ -444,20 +444,75 @@
         <section id="page-cadastro" class="page" style="padding-bottom: 80px;">
             <!-- Navegação de sub-abas (visível apenas no mobile) -->
             <div class="sub-tabs-cadastro">
-                <button class="sub-tab active" onclick="switchSubCadastro('sub-plantel', this)"
-                    data-icon="plantel">Plantel</button>
-                <button class="sub-tab" onclick="switchSubCadastro('sub-clientes', this)"
-                    data-icon="cliente">Clientes</button>
-                <button class="sub-tab" onclick="switchSubCadastro('sub-produtos', this)"
-                    data-icon="produto">Produtos</button>
-                <button class="sub-tab" onclick="switchSubCadastro('sub-insumos', this)"
-                    data-icon="insumo">Insumos</button>
+                <button type="button" class="sub-tab active" data-subtarget="sub-plantel"
+                    onclick="switchSubCadastro('sub-plantel', this)" data-icon="plantel">Plantel</button>
+                <button type="button" class="sub-tab" data-subtarget="sub-clientes"
+                    onclick="switchSubCadastro('sub-clientes', this)" data-icon="cliente">Clientes</button>
+                <button type="button" class="sub-tab" data-subtarget="sub-produtos"
+                    onclick="switchSubCadastro('sub-produtos', this)" data-icon="produto">Produtos</button>
+                <button type="button" class="sub-tab" data-subtarget="sub-insumos"
+                    onclick="switchSubCadastro('sub-insumos', this)" data-icon="insumo">Insumos</button>
             </div>
 
-            <div class="grid-2 cadastro-tabs-container">
+            <div class="cadastro-layout">
+                <!-- Painel Lateral de Atalhos (Desktop) -->
+                <aside class="cadastro-sidebar card" aria-label="Atalhos de Dados">
+                    <div class="cadastro-sidebar-title">
+                        <i class="fas fa-folder-open" style="color: var(--green);"></i>
+                        <span>Menu de Dados</span>
+                    </div>
+                    <nav class="cadastro-sidebar-nav">
+                        <button type="button" class="cadastro-side-btn active" data-subtarget="sub-plantel"
+                            data-icon="plantel" onclick="switchSubCadastro('sub-plantel', this)">
+                            <span class="side-btn-left">
+                                <span class="side-btn-icon"></span>
+                                <span class="side-btn-text">
+                                    <strong>Plantel</strong>
+                                    <small>Aves e consumo</small>
+                                </span>
+                            </span>
+                            <span class="side-btn-count" id="sideCountPlantel">0</span>
+                        </button>
+                        <button type="button" class="cadastro-side-btn" data-subtarget="sub-clientes"
+                            data-icon="cliente" onclick="switchSubCadastro('sub-clientes', this)">
+                            <span class="side-btn-left">
+                                <span class="side-btn-icon"></span>
+                                <span class="side-btn-text">
+                                    <strong>Clientes</strong>
+                                    <small>Contatos e cidades</small>
+                                </span>
+                            </span>
+                            <span class="side-btn-count" id="sideCountClientes">0</span>
+                        </button>
+                        <button type="button" class="cadastro-side-btn" data-subtarget="sub-produtos"
+                            data-icon="produto" onclick="switchSubCadastro('sub-produtos', this)">
+                            <span class="side-btn-left">
+                                <span class="side-btn-icon"></span>
+                                <span class="side-btn-text">
+                                    <strong>Produtos</strong>
+                                    <small>Preços e bandejas</small>
+                                </span>
+                            </span>
+                            <span class="side-btn-count" id="sideCountProdutos">0</span>
+                        </button>
+                        <button type="button" class="cadastro-side-btn" data-subtarget="sub-insumos"
+                            data-icon="insumo" onclick="switchSubCadastro('sub-insumos', this)">
+                            <span class="side-btn-left">
+                                <span class="side-btn-icon"></span>
+                                <span class="side-btn-text">
+                                    <strong>Insumos</strong>
+                                    <small>Rações e embalagens</small>
+                                </span>
+                            </span>
+                            <span class="side-btn-count" id="sideCountInsumos">0</span>
+                        </button>
+                    </nav>
+                </aside>
+
+                <div class="cadastro-tabs-container">
                 <!-- Sub-página: Plantel -->
                 <div id="sub-plantel" class="sub-page-cadastro active">
-                    <div class="card card-plantel" style="margin-bottom: 20px;">
+                    <form class="card card-plantel" id="plantelForm" style="margin-bottom: 20px;">
                         <div class="card-header">
                             <h2>Gerenciamento do Plantel</h2>
                         </div>
@@ -466,22 +521,22 @@
                                 <div class="field">
                                     <label for="plantel-inicial">Inicial (0-6 sem.)</label>
                                     <input id="plantel-inicial" type="number" class="plantel-input" data-fase="inicial"
-                                        value="0" min="0" onchange="saveGalinhas()">
+                                        value="0" min="0" oninput="previewPlantelConsumo()">
                                 </div>
                                 <div class="field">
                                     <label for="plantel-crescimento">Crescimento (7-17 sem.)</label>
                                     <input id="plantel-crescimento" type="number" class="plantel-input"
-                                        data-fase="crescimento" value="0" min="0" onchange="saveGalinhas()">
+                                        data-fase="crescimento" value="0" min="0" oninput="previewPlantelConsumo()">
                                 </div>
                                 <div class="field">
                                     <label for="plantel-prepostura">Pré-Postura (18-20 sem.)</label>
                                     <input id="plantel-prepostura" type="number" class="plantel-input"
-                                        data-fase="prePostura" value="0" min="0" onchange="saveGalinhas()">
+                                        data-fase="prePostura" value="0" min="0" oninput="previewPlantelConsumo()">
                                 </div>
                                 <div class="field">
                                     <label for="plantel-postura">Postura (20+ sem.)</label>
                                     <input id="plantel-postura" type="number" class="plantel-input" data-fase="postura"
-                                        value="0" min="0" onchange="saveGalinhas()">
+                                        value="0" min="0" oninput="previewPlantelConsumo()">
                                 </div>
                             </div>
 
@@ -500,126 +555,177 @@
                                     <b style="color: var(--red);"><span id="consumoDiarioEstimado">0</span> kg/dia</b>
                                 </div>
                             </div>
+
+                            <button type="submit" id="btnSavePlantel" class="btn primary full admin-only" style="margin-top: 16px;">
+                                <i class="fas fa-save"></i> Salvar Quantidades do Plantel
+                            </button>
                         </div>
-                    </div>
+                    </form>
                 </div>
 
                 <!-- Sub-página: Clientes -->
                 <div id="sub-clientes" class="sub-page-cadastro">
-                    <form class="card" id="clientForm">
-                        <div class="card-header">
-                            <h2>Novo Cliente</h2>
-                        </div>
-                        <div class="field">
-                            <label for="clientName">Nome Completo</label>
-                            <input id="clientName" type="text" placeholder="Ex: João Silva">
-                        </div>
-                        <div class="grid-2">
-                            <div class="field">
-                                <label for="clientPhone">Telefone / WhatsApp</label>
-                                <input id="clientPhone" type="tel" placeholder="(00) 00000-0000">
+                    <div class="cadastro-section-stack">
+                        <form class="card cadastro-form-card" id="clientForm">
+                            <div class="card-header">
+                                <h2>Novo Cliente</h2>
+                                <span class="badge green" style="font-size: 0.68rem;">Cadastro</span>
                             </div>
                             <div class="field">
-                                <label for="clientCity">Cidade</label>
-                                <input id="clientCity" type="text" placeholder="Ex: União dos Palmares">
+                                <label for="clientName">Nome Completo</label>
+                                <input id="clientName" type="text" placeholder="Ex: João Silva">
                             </div>
+                            <div class="grid-2">
+                                <div class="field">
+                                    <label for="clientPhone">Telefone / WhatsApp</label>
+                                    <input id="clientPhone" type="tel" placeholder="(00) 00000-0000">
+                                </div>
+                                <div class="field">
+                                    <label for="clientCity">Cidade</label>
+                                    <input id="clientCity" type="text" placeholder="Ex: União dos Palmares">
+                                </div>
+                            </div>
+                            <button class="btn primary full" type="submit">
+                                <i class="fas fa-user-plus"></i> Salvar Cliente
+                            </button>
+                        </form>
+
+                        <div class="card cadastro-list-card">
+                            <div class="card-header cadastro-list-header">
+                                <h2><i class="fas fa-address-book" style="color: var(--green);"></i> Clientes Cadastrados</h2>
+                                <span id="clientListCount" class="badge blue">0 registros</span>
+                            </div>
+                            <div class="cadastro-search-wrap">
+                                <i class="fas fa-search"></i>
+                                <input id="searchClientInput" type="text" placeholder="Buscar cliente por nome, cidade ou telefone..." oninput="renderClients()">
+                            </div>
+                            <div class="list" id="clientList"></div>
                         </div>
-                        <button class="btn primary full" type="submit">Salvar Cliente</button>
-                        <div class="list" id="clientList" style="margin-top:15px"></div>
-                    </form>
+                    </div>
                 </div>
 
                 <!-- Sub-página: Produtos -->
                 <div id="sub-produtos" class="sub-page-cadastro">
-                    <form class="card" id="productForm">
-                        <div class="card-header">
-                            <h2>Novo Produto</h2>
-                        </div>
-                        <div class="field">
-                            <label for="productName">Nome do Produto</label>
-                            <input id="productName" type="text" placeholder="Ex: Bandeja 30 G">
-                        </div>
-                        <div class="grid-3">
-                            <div class="field">
-                                <label for="productPrice">Preço R$</label>
-                                <input id="productPrice" type="text" inputmode="decimal">
+                    <div class="cadastro-section-stack">
+                        <form class="card cadastro-form-card" id="productForm">
+                            <div class="card-header">
+                                <h2>Novo Produto</h2>
+                                <span class="badge green" style="font-size: 0.68rem;">Cadastro</span>
                             </div>
                             <div class="field">
-                                <label for="productType">Tipo Ovo</label>
-                                <select id="productType">
-                                    <option value="Grande">Grande</option>
-                                    <option value="Medio">Médio</option>
-                                    <option value="Pequeno">Pequeno</option>
-                                </select>
+                                <label for="productName">Nome do Produto</label>
+                                <input id="productName" type="text" placeholder="Ex: Bandeja 30 G">
                             </div>
-                            <div class="field">
-                                <label for="productEggs">Qtd Ovos</label>
-                                <input id="productEggs" type="number" value="30">
+                            <div class="grid-3">
+                                <div class="field">
+                                    <label for="productPrice">Preço R$</label>
+                                    <input id="productPrice" type="text" inputmode="decimal">
+                                </div>
+                                <div class="field">
+                                    <label for="productType">Tipo Ovo</label>
+                                    <select id="productType">
+                                        <option value="Grande">Grande</option>
+                                        <option value="Medio">Médio</option>
+                                        <option value="Pequeno">Pequeno</option>
+                                    </select>
+                                </div>
+                                <div class="field">
+                                    <label for="productEggs">Qtd Ovos</label>
+                                    <input id="productEggs" type="number" value="30">
+                                </div>
                             </div>
-                        </div>
 
-                        <div class="field" style="margin-top: 10px;">
-                            <button type="button" class="btn ghost small" onclick="openCompositionModal('new')"
-                                style="width: 100%; border-style: dashed; border-color: var(--blue); color: var(--blue);">
-                                <i class="fas fa-layer-group"></i> Configurar Composição
+                            <div class="field" style="margin-top: 10px;">
+                                <button type="button" class="btn ghost small" onclick="openCompositionModal('new')"
+                                    style="width: 100%; border-style: dashed; border-color: var(--blue); color: var(--blue);">
+                                    <i class="fas fa-layer-group"></i> Configurar Composição
+                                </button>
+                                <div id="compositionSummary"
+                                    style="margin-top: 8px; font-size: 0.8rem; color: var(--muted); font-weight: 600; text-align: center;">
+                                    Nenhuma composição definida.
+                                </div>
+                            </div>
+
+                            <button class="btn primary full" type="submit" style="margin-top: 10px;">
+                                <i class="fas fa-plus-circle"></i> Salvar Produto
                             </button>
-                            <div id="compositionSummary"
-                                style="margin-top: 8px; font-size: 0.8rem; color: var(--muted); font-weight: 600; text-align: center;">
-                                Nenhuma composição definida.
-                            </div>
-                        </div>
+                        </form>
 
-                        <button class="btn primary full" type="submit" style="margin-top: 10px;">Salvar Produto</button>
-                        <div class="list" id="productList" style="margin-top:15px"></div>
-                    </form>
+                        <div class="card cadastro-list-card">
+                            <div class="card-header cadastro-list-header">
+                                <h2><i class="fas fa-boxes" style="color: var(--green);"></i> Produtos Cadastrados</h2>
+                                <span id="productListCount" class="badge blue">0 registros</span>
+                            </div>
+                            <div class="cadastro-search-wrap">
+                                <i class="fas fa-search"></i>
+                                <input id="searchProductInput" type="text" placeholder="Buscar produto por nome ou tipo de ovo..." oninput="renderProducts()">
+                            </div>
+                            <div class="list" id="productList"></div>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- Sub-página: Insumos -->
                 <div id="sub-insumos" class="sub-page-cadastro">
-                    <form class="card" id="insumoForm">
-                        <div class="card-header">
-                            <h2>Cadastrar Insumo</h2>
-                        </div>
-
-                        <div class="field">
-                            <label for="insumoName">Nome do Insumo</label>
-                            <input id="insumoName" type="text" placeholder="Ex: Bandeja Papelão 30">
-                        </div>
-
-                        <div
-                            style="background: var(--surface-2); padding: 12px; border-radius: var(--radius); margin-bottom: 15px; border: 1px solid var(--line);">
-                            <label for="insumoTipoConsumo"
-                                style="font-weight: 600; color: var(--ink); display: block; margin-bottom: 8px;">Tipo de
-                                Insumo</label>
-                            <select id="insumoTipoConsumo" onchange="toggleUnitIndicator()"
-                                style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--line);">
-                                <option value="GERAL">Embalagem / Outros (un)</option>
-                                <option value="inicial">Ração: Inicial (kg)</option>
-                                <option value="crescimento">Ração: Crescimento (kg)</option>
-                                <option value="prePostura">Ração: Pré-Postura (kg)</option>
-                                <option value="postura">Ração: Postura (kg)</option>
-                            </select>
-                            <small style="color: var(--muted); display: block; margin-top: 5px;">Rações entram e saem em
-                                kg. Os demais insumos entram como unidades.</small>
-                        </div>
-
-                        <div class="field">
-                            <label id="insumoQtyLabel">Estoque Inicial (un)</label>
-                            <div style="position: relative;">
-                                <input id="insumoQtyInitial" type="number" value="0" min="0" step="0.01"
-                                    style="padding-right: 45px;">
-                                <span id="unitIndicator"
-                                    style="position: absolute; right: 15px; top: 50%; transform: translateY(-50%); color: var(--muted); font-size: 0.8rem; font-weight: bold;">un</span>
+                    <div class="cadastro-section-stack">
+                        <form class="card cadastro-form-card" id="insumoForm">
+                            <div class="card-header">
+                                <h2>Cadastrar Insumo</h2>
+                                <span class="badge blue" style="font-size: 0.68rem;">Cadastro</span>
                             </div>
+
+                            <div class="field">
+                                <label for="insumoName">Nome do Insumo</label>
+                                <input id="insumoName" type="text" placeholder="Ex: Bandeja Papelão 30">
+                            </div>
+
+                            <div
+                                style="background: var(--surface-2); padding: 12px; border-radius: var(--radius); margin-bottom: 15px; border: 1px solid var(--line);">
+                                <label for="insumoTipoConsumo"
+                                    style="font-weight: 600; color: var(--ink); display: block; margin-bottom: 8px;">Tipo de
+                                    Insumo</label>
+                                <select id="insumoTipoConsumo" onchange="toggleUnitIndicator()"
+                                    style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--line);">
+                                    <option value="GERAL">Embalagem / Outros (un)</option>
+                                    <option value="inicial">Ração: Inicial (kg)</option>
+                                    <option value="crescimento">Ração: Crescimento (kg)</option>
+                                    <option value="prePostura">Ração: Pré-Postura (kg)</option>
+                                    <option value="postura">Ração: Postura (kg)</option>
+                                </select>
+                                <small style="color: var(--muted); display: block; margin-top: 5px;">Rações entram e saem em
+                                    kg. Os demais insumos entram como unidades.</small>
+                            </div>
+
+                            <div class="field">
+                                <label id="insumoQtyLabel">Estoque Inicial (un)</label>
+                                <div style="position: relative;">
+                                    <input id="insumoQtyInitial" type="number" value="0" min="0" step="0.01"
+                                        style="padding-right: 45px;">
+                                    <span id="unitIndicator"
+                                        style="position: absolute; right: 15px; top: 50%; transform: translateY(-50%); color: var(--muted); font-size: 0.8rem; font-weight: bold;">un</span>
+                                </div>
+                            </div>
+
+                            <button class="btn blue full" type="submit">
+                                <i class="fas fa-plus"></i> Cadastrar Insumo
+                            </button>
+                        </form>
+
+                        <div class="card cadastro-list-card">
+                            <div class="card-header cadastro-list-header">
+                                <h2><i class="fas fa-warehouse" style="color: var(--blue);"></i> Insumos e Rações Cadastrados</h2>
+                                <span id="insumoListCount" class="badge blue">0 registros</span>
+                            </div>
+                            <div class="cadastro-search-wrap">
+                                <i class="fas fa-search"></i>
+                                <input id="searchInsumoInput" type="text" placeholder="Buscar embalagem ou ração..." oninput="renderInsumos()">
+                            </div>
+                            <div class="list" id="insumoList"></div>
                         </div>
-
-                        <button class="btn blue full" type="submit">
-                            <i class="fas fa-plus"></i> Cadastrar Insumo
-                        </button>
-
-                        <div class="list" id="insumoList" style="margin-top:15px"></div>
-                    </form>
+                    </div>
                 </div>
+            </div>
+            </div>
         </section>
 
         <section id="page-configuracoes" class="page">
