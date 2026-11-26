@@ -76,23 +76,20 @@ export function setupPwaInstallButton() {
 
 export function switchSubCadastro(id, btn) {
     document.querySelectorAll('.sub-page-cadastro').forEach(p => p.classList.remove('active'));
-    document.querySelectorAll('.sub-tab, .cadastro-side-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('#page-cadastro .sub-tab, #page-cadastro .cadastro-side-btn').forEach(b => b.classList.remove('active'));
 
     document.getElementById(id)?.classList.add('active');
-    document.querySelectorAll(`[data-subtarget="${id}"]`).forEach(el => el.classList.add('active'));
+    document.querySelectorAll(`#page-cadastro [data-subtarget="${id}"]`).forEach(el => el.classList.add('active'));
     btn?.classList.add('active');
 }
 
 export function switchSubConfig(id, btn) {
     document.querySelectorAll('.sub-page-config').forEach(p => p.classList.remove('active'));
-    document.querySelectorAll('.config-sub-tab').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.config-sub-tab, .config-side-btn').forEach(b => b.classList.remove('active'));
 
     document.getElementById(id)?.classList.add('active');
-    if (btn) {
-        btn.classList.add('active');
-    } else {
-        document.querySelector(`.config-sub-tab[data-target="${id}"]`)?.classList.add('active');
-    }
+    document.querySelectorAll(`.config-sub-tab[data-target="${id}"], .config-side-btn[data-target="${id}"]`).forEach(el => el.classList.add('active'));
+    btn?.classList.add('active');
 }
 
 export function renderSubTabsIcons() {
@@ -106,7 +103,7 @@ export function renderSubTabsIcons() {
         }
     });
 
-    document.querySelectorAll('.cadastro-side-btn').forEach(btn => {
+    document.querySelectorAll('#page-cadastro .cadastro-side-btn').forEach(btn => {
         if (btn.dataset.iconRendered) return;
         const iconName = btn.dataset.icon;
         const iconSlot = btn.querySelector('.side-btn-icon');
@@ -127,6 +124,8 @@ export function renderSubTabsIcons() {
         setCount('sideCountClientes', (db.clientes || []).length);
         setCount('sideCountProdutos', (db.produtos || []).length);
         setCount('sideCountInsumos', (db.insumos || []).length);
+        setCount('sideCountUsuarios', (db.usuarios || []).length);
+        setCount('sideCountLogs', (db.logs || []).length);
     }
 }
 
