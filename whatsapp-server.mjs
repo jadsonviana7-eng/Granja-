@@ -28,6 +28,98 @@ let currentQrDataUrl = "";
 let connectedUser = null;
 let isReconnecting = false;
 let isProcessingBridge = false;
+let authBackupTimer = null;
+
+// ─── Backup e Restauração da Sessão do WhatsApp no Supabase (Para Nuvem 24h / Render) ───
+async function restoreAuthSessionFromSupabase() {
+    try {
+        const credsPath = path.join(AUTH_DIR, "creds.json");
+        if (fs.existsSync(credsPath)) return true;
+
+        const { data: row, error } = await supabase
+            .from("granja_data")
+            .select("db_content")
+            .order("updated_at", { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+        const backup = row?.db_content?.whatsapp_auth_backup;
+        if (error || !backup || typeof backup !== "object" || !backup["creds.json"]) {
+            return false;
+        }
+
+        if (!fs.existsSync(AUTH_DIR)) {
+            fs.mkdirSync(AUTH_DIR, { recursive: true });
+        }
+
+        for (const [fileName, fileContent] of Object.entries(backup)) {
+            if (!fileName.endsWith(".json") || fileName.includes("/") || fileName.includes("\\")) continue;
+            fs.writeFileSync(path.join(AUTH_DIR, fileName), String(fileContent), "utf-8");
+        }
+        console.log("[WhatsApp Cloud] Sessão do WhatsApp restaurada automaticamente do Supabase!");
+        return true;
+    } catch (err) {
+        console.warn("[WhatsApp Cloud] Aviso ao restaurar sessão do Supabase:", err.message);
+        return false;
+    }
+}
+
+function scheduleAuthSessionBackupToSupabase() {
+    if (authBackupTimer) clearTimeout(authBackupTimer);
+    authBackupTimer = setTimeout(async () => {
+        try {
+            const credsPath = path.join(AUTH_DIR, "creds.json");
+            if (!fs.existsSync(credsPath)) return;
+
+            const files = fs.readdirSync(AUTH_DIR).filter(f => f.endsWith(".json"));
+            const backup = {};
+            for (const file of files) {
+                // Salva creds.json, app-state-sync-key e sessões principais (mantendo o payload leve)
+                if (file === "creds.json" || file.startsWith("app-state-sync-key") || file.startsWith("session-")) {
+                    backup[file] = fs.readFileSync(path.join(AUTH_DIR, file), "utf-8");
+                }
+            }
+
+            if (!backup["creds.json"]) return;
+
+            const { data: row, error } = await supabase
+                .from("granja_data")
+                .select("id, db_content")
+                .order("updated_at", { ascending: false })
+                .limit(1)
+                .maybeSingle();
+
+            if (error || !row) return;
+            const content = (row.db_content && typeof row.db_content === "object") ? row.db_content : {};
+            content.whatsapp_auth_backup = backup;
+
+            await supabase
+                .from("granja_data")
+                .update({ db_content: content })
+                .eq("id", row.id);
+        } catch (_) {}
+    }, 3000);
+}
+
+async function clearAuthSessionInSupabase() {
+    try {
+        const { data: row, error } = await supabase
+            .from("granja_data")
+            .select("id, db_content")
+            .order("updated_at", { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+        if (error || !row) return;
+        const content = (row.db_content && typeof row.db_content === "object") ? row.db_content : {};
+        delete content.whatsapp_auth_backup;
+
+        await supabase
+            .from("granja_data")
+            .update({ db_content: content })
+            .eq("id", row.id);
+    } catch (_) {}
+}
 
 async function syncBridgeStatusToSupabase() {
     try {
@@ -66,7 +158,6 @@ async function generatePairingCodeForPhone(rawPhone) {
         throw new Error("Informe o número do WhatsApp com DDD (ex: 82982289108).");
     }
 
-    // Reinicia a sessão não-registrada para garantir um socket limpo e janela completa de validade do código
     if (sock && connectionStatus !== "connected") {
         try {
             sock.ev.removeAllListeners();
@@ -78,11 +169,11 @@ async function generatePairingCodeForPhone(rawPhone) {
     try {
         fs.rmSync(AUTH_DIR, { recursive: true, force: true });
     } catch (_) {}
+    await clearAuthSessionInSupabase();
 
     isReconnecting = false;
     await startWhatsApp(true);
 
-    // Aguarda o socket entrar no estado de QR (pronto para solicitar código de pareamento)
     for (let i = 0; i < 25; i++) {
         if (sock && (connectionStatus === "qr" || sock.authState?.creds)) {
             break;
@@ -145,7 +236,6 @@ async function pollSupabaseBridgeCommands() {
 
         if (!cmd || cmd.status !== "pending") return;
 
-        // Ignora comandos expirados (> 2 minutos)
         if (cmd.createdAt && (Date.now() - cmd.createdAt > 120000)) {
             content.whatsapp_cmd = { ...cmd, status: "error", error: "Tempo limite excedido." };
             await supabase.from("granja_data").update({ db_content: content }).eq("id", row.id);
@@ -168,6 +258,7 @@ async function pollSupabaseBridgeCommands() {
             } else if (cmd.action === "logout") {
                 if (sock) await sock.logout().catch(() => {});
                 fs.rmSync(AUTH_DIR, { recursive: true, force: true });
+                await clearAuthSessionInSupabase();
                 connectionStatus = "disconnected";
                 connectedUser = null;
                 currentQrDataUrl = "";
@@ -215,6 +306,9 @@ async function startWhatsApp(forceFresh = false) {
     isReconnecting = true;
 
     try {
+        if (!forceFresh) {
+            await restoreAuthSessionFromSupabase();
+        }
         if (!fs.existsSync(AUTH_DIR)) {
             fs.mkdirSync(AUTH_DIR, { recursive: true });
         }
@@ -231,13 +325,15 @@ async function startWhatsApp(forceFresh = false) {
             auth: state,
             printQRInTerminal: false,
             logger: pino({ level: "silent" }),
-            // IMPORTANTE: O pareamento por código de 8 dígitos do WhatsApp exige assinatura oficial Ubuntu/Chrome
             browser: Browsers.ubuntu("Chrome"),
             syncFullHistory: false,
             markOnlineOnConnect: false
         });
 
-        sock.ev.on("creds.update", saveCreds);
+        sock.ev.on("creds.update", async () => {
+            await saveCreds();
+            scheduleAuthSessionBackupToSupabase();
+        });
 
         sock.ev.on("connection.update", async (update) => {
             const { connection, lastDisconnect, qr } = update;
@@ -266,6 +362,7 @@ async function startWhatsApp(forceFresh = false) {
                 };
                 console.log(`[WhatsApp API] Conectado com sucesso como: ${connectedUser.name} (${connectedUser.id})`);
                 syncBridgeStatusToSupabase();
+                scheduleAuthSessionBackupToSupabase();
             }
 
             if (connection === "close") {
@@ -282,6 +379,7 @@ async function startWhatsApp(forceFresh = false) {
                     try {
                         fs.rmSync(AUTH_DIR, { recursive: true, force: true });
                     } catch (_) {}
+                    await clearAuthSessionInSupabase();
                 }
 
                 setTimeout(() => {
@@ -404,6 +502,7 @@ const server = http.createServer(async (req, res) => {
                 await sock.logout().catch(() => {});
             }
             fs.rmSync(AUTH_DIR, { recursive: true, force: true });
+            await clearAuthSessionInSupabase();
             connectionStatus = "disconnected";
             connectedUser = null;
             currentQrDataUrl = "";
@@ -474,7 +573,7 @@ const server = http.createServer(async (req, res) => {
 server.listen(PORT, "0.0.0.0", () => {
     console.log(`====================================================`);
     console.log(`[WhatsApp API] Servidor Próprio rodando em http://localhost:${PORT}`);
-    console.log(`[WhatsApp Bridge] Ponte em nuvem com Supabase ativa (permite uso direto pelo celular!)`);
+    console.log(`[WhatsApp Bridge] Ponte em nuvem + Backup de Sessão no Supabase ativos!`);
     console.log(`====================================================`);
     startWhatsApp();
     setInterval(pollSupabaseBridgeCommands, 1500);

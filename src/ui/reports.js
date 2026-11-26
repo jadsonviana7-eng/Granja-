@@ -1235,6 +1235,31 @@ export function renderReceiptPreview() {
     prepareReceiptPdfCache(sale, mode);
 }
 
+async function checkIsWhatsappApiReady() {
+    const emp = getEmpresaConfig();
+    if (!emp.whatsappApiProvider) return false;
+    if (emp.whatsappApiProvider !== "proprio") return true;
+
+    const baseUrl = String(emp.whatsappApiUrl || "http://localhost:3001").replace(/\/+$/, "");
+    try {
+        if (!shouldUseSupabaseBridgeOnly(baseUrl)) {
+            const ctrl = new AbortController();
+            const timer = setTimeout(() => ctrl.abort(), 1800);
+            const res = await fetch(`${baseUrl}/status`, { method: "GET", signal: ctrl.signal });
+            clearTimeout(timer);
+            const data = await res.json();
+            if (data && data.connected) return true;
+        }
+    } catch (_) {}
+
+    try {
+        const bridge = await readSupabaseWhatsappBridgeStatus();
+        if (bridge && bridge.connected) return true;
+    } catch (_) {}
+
+    return false;
+}
+
 async function prepareReceiptPdfCache(sale, mode) {
     const token = ++receiptPdfBuildToken;
     cachedReceiptPdf = null;
@@ -1246,11 +1271,15 @@ async function prepareReceiptPdfCache(sale, mode) {
     }
 
     try {
-        const result = await generateReceiptPdfFile(sale, mode);
+        const [result, apiServerReady] = await Promise.all([
+            generateReceiptPdfFile(sale, mode),
+            checkIsWhatsappApiReady()
+        ]);
         if (token !== receiptPdfBuildToken) return;
         cachedReceiptPdf = {
             saleId: Number(sale.id),
             mode,
+            apiServerReady,
             ...result
         };
     } catch (err) {
@@ -1633,9 +1662,10 @@ export async function sendSaleReceiptWhatsApp() {
     const msgAgradecimento = `Olá, *${clienteNome}*! Segue o recibo referente à sua compra na *${nomeEmpresa}*.\n\n${rodapeAgradecimento}`;
 
     const hasReadyCache = cachedReceiptPdf && cachedReceiptPdf.saleId === Number(sale.id) && cachedReceiptPdf.mode === mode;
+    const isApiOnline = hasReadyCache ? Boolean(cachedReceiptPdf.apiServerReady) : (emp.whatsappApiProvider && emp.whatsappApiProvider !== "proprio");
 
-    // 1) Se a API de WhatsApp estiver configurada (funciona tanto pelo PC quanto pelo celular via Ponte em Nuvem do Supabase!):
-    if (emp.whatsappApiProvider) {
+    // 1) Se o servidor da API estiver online e conectado (no PC ou na nuvem), envia 100% automático para o número do cliente!
+    if (emp.whatsappApiProvider && isApiOnline) {
         let rawPhone = clienteCad?.telefone || "";
         let phoneDDI = normalizeWhatsappNumber(rawPhone);
 
@@ -1660,7 +1690,7 @@ export async function sendSaleReceiptWhatsApp() {
 
         try {
             const pdfData = hasReadyCache ? cachedReceiptPdf : await generateReceiptPdfFile(sale, mode);
-            cachedReceiptPdf = { saleId: Number(sale.id), mode, ...pdfData };
+            cachedReceiptPdf = { saleId: Number(sale.id), mode, apiServerReady: true, ...pdfData };
 
             await sendPdfViaWhatsappApi({
                 emp,
@@ -1681,9 +1711,21 @@ export async function sendSaleReceiptWhatsApp() {
             toast(`✅ PDF enviado diretamente para o WhatsApp de ${clienteNome} (${clienteCad?.telefone || phoneDDI})!`);
             return;
         } catch (err) {
-            console.error("Erro no envio via API WhatsApp:", err);
-            toast("Falha na API WhatsApp: " + (err?.message || "verifique os Ajustes"));
-            return;
+            console.warn("Servidor API indisponível no momento, ativando fallback local:", err);
+            if (cachedReceiptPdf) cachedReceiptPdf.apiServerReady = false;
+            const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent || "");
+            if (isMobile && navigator.canShare && cachedReceiptPdf?.pdfFile && navigator.canShare({ files: [cachedReceiptPdf.pdfFile] })) {
+                toast("Servidor desligado: toque novamente em 'Enviar PDF' para compartilhar pelo WhatsApp do celular.");
+                return;
+            }
+            // No computador, faz fallback imediato baixando o PDF e abrindo a conversa do cliente
+            if (cachedReceiptPdf?.pdfBlob) {
+                triggerBlobDownload(cachedReceiptPdf.pdfBlob, cachedReceiptPdf.fileName);
+                const whatsappUrl = `https://wa.me/${phoneDDI}?text=${encodeURIComponent(msgAgradecimento)}`;
+                window.open(whatsappUrl, "_blank", "noopener,noreferrer");
+                toast(`Servidor offline: PDF baixado e conversa de ${clienteNome} aberta!`);
+                return;
+            }
         } finally {
             if (btnZap) {
                 btnZap.disabled = false;
@@ -1692,7 +1734,8 @@ export async function sendSaleReceiptWhatsApp() {
         }
     }
 
-    // 2) Modo sem API externa: compartilhamento nativo do arquivo PDF (copia o telefone do cliente automaticamente para facilitar a busca)
+    // 2) Fallback Automático (quando o computador/servidor estiver desligado ou API desativada):
+    // No celular, dispara navigator.share() de forma 100% síncrona no primeiro toque (sem perder o user gesture!)
     if (hasReadyCache && navigator.canShare && navigator.canShare({ files: [cachedReceiptPdf.pdfFile] })) {
         try {
             if (clienteCad?.telefone && navigator.clipboard?.writeText) {
@@ -1703,7 +1746,7 @@ export async function sendSaleReceiptWhatsApp() {
                 title: cachedReceiptPdf.fileName,
                 text: msgAgradecimento
             });
-            toast("Recibo em PDF enviado com sucesso!");
+            toast("Recibo em PDF compartilhado com sucesso!");
             return;
         } catch (err) {
             if (err && err.name === "AbortError") return;
