@@ -64,8 +64,8 @@ async function readSupabaseWhatsappBridgeStatus() {
         .maybeSingle();
     if (error || !row?.db_content?.whatsapp_bridge) return null;
     const bridge = row.db_content.whatsapp_bridge;
-    // Verifica se o servidor atualizou o heartbeat nos últimos 45 segundos
-    if (bridge.heartbeat && (Date.now() - bridge.heartbeat > 45000)) {
+    // Verifica se o servidor atualizou o heartbeat nos últimos 10 minutos (heartbeat a cada 5 min)
+    if (bridge.heartbeat && (Date.now() - bridge.heartbeat > 10 * 60 * 1000)) {
         return null;
     }
     return bridge;
@@ -88,7 +88,7 @@ async function executeSupabaseWhatsappBridgeCmd(cmdPayload, timeoutMs = 20000) {
 
     const content = (row.db_content && typeof row.db_content === "object") ? row.db_content : {};
     const bridge = content.whatsapp_bridge;
-    if (!bridge || (bridge.heartbeat && (Date.now() - bridge.heartbeat > 45000))) {
+    if (!bridge || (bridge.heartbeat && (Date.now() - bridge.heartbeat > 10 * 60 * 1000))) {
         throw new Error("O servidor WhatsApp do PC está desligado. Deixe o 'abrir-pwa.bat' ou 'npm run whatsapp' aberto no PC.");
     }
 

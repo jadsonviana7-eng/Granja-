@@ -223,11 +223,20 @@ async function pollSupabaseBridgeCommands() {
     isProcessingBridge = true;
 
     try {
+        // Check ultraleve (~4 bytes): só baixa db_content se existir whatsapp_cmd com status === 'pending'
+        const { data: checkRow, error: checkErr } = await supabase
+            .from("granja_data")
+            .select("id")
+            .eq("db_content->whatsapp_cmd->>status", "pending")
+            .limit(1)
+            .maybeSingle();
+
+        if (checkErr || !checkRow) return;
+
         const { data: row, error } = await supabase
             .from("granja_data")
             .select("id, db_content")
-            .order("updated_at", { ascending: false })
-            .limit(1)
+            .eq("id", checkRow.id)
             .maybeSingle();
 
         if (error || !row || !row.db_content) return;
@@ -575,11 +584,27 @@ const RENDER_URL = process.env.RENDER_EXTERNAL_URL || "https://granja-bykk.onren
 server.listen(PORT, "0.0.0.0", () => {
     console.log(`====================================================`);
     console.log(`[WhatsApp API] Servidor Próprio rodando na porta ${PORT}`);
-    console.log(`[WhatsApp Bridge] Ponte em nuvem + Backup de Sessão no Supabase ativos!`);
+    console.log(`[WhatsApp Bridge] Ponte em nuvem (Realtime + Economia de Egress) ativa!`);
     console.log(`====================================================`);
     startWhatsApp();
-    setInterval(pollSupabaseBridgeCommands, 1500);
-    setInterval(syncBridgeStatusToSupabase, 12000);
+    // Escuta em tempo real (evita downloads repetidos do db_content em repouso)
+    try {
+        supabase
+            .channel("granja-whatsapp-bridge")
+            .on(
+                "postgres_changes",
+                { event: "UPDATE", schema: "public", table: "granja_data" },
+                () => {
+                    pollSupabaseBridgeCommands();
+                }
+            )
+            .subscribe();
+    } catch (_) {}
+
+    // Fallback ultraleve a cada 20s (só baixa db_content se status === 'pending')
+    setInterval(pollSupabaseBridgeCommands, 20000);
+    // Heartbeat de status a cada 5 minutos (mudanças de conexão já sincronizam imediatamente)
+    setInterval(syncBridgeStatusToSupabase, 5 * 60 * 1000);
     // Keep-alive automático a cada 10 minutos para evitar hibernação no Render Free
     setInterval(() => {
         fetch(`${RENDER_URL}/status`).catch(() => {});
