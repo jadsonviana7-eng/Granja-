@@ -56,19 +56,15 @@ function shouldUseSupabaseBridgeOnly(baseUrl) {
 
 async function readSupabaseWhatsappBridgeStatus() {
     if (!supabaseClient) return null;
+    // Busca apenas o subcampo whatsapp_bridge (~150 bytes em vez de baixar 114 KB do db_content inteiro)
     const { data: row, error } = await supabaseClient
         .from("granja_data")
-        .select("db_content")
+        .select("whatsapp_bridge:db_content->whatsapp_bridge")
         .order("updated_at", { ascending: false })
         .limit(1)
         .maybeSingle();
-    if (error || !row?.db_content?.whatsapp_bridge) return null;
-    const bridge = row.db_content.whatsapp_bridge;
-    // Verifica se o servidor atualizou o heartbeat nos últimos 10 minutos (heartbeat a cada 5 min)
-    if (bridge.heartbeat && (Date.now() - bridge.heartbeat > 10 * 60 * 1000)) {
-        return null;
-    }
-    return bridge;
+    if (error || !row?.whatsapp_bridge) return null;
+    return row.whatsapp_bridge;
 }
 
 async function executeSupabaseWhatsappBridgeCmd(cmdPayload, timeoutMs = 20000) {
@@ -88,8 +84,8 @@ async function executeSupabaseWhatsappBridgeCmd(cmdPayload, timeoutMs = 20000) {
 
     const content = (row.db_content && typeof row.db_content === "object") ? row.db_content : {};
     const bridge = content.whatsapp_bridge;
-    if (!bridge || (bridge.heartbeat && (Date.now() - bridge.heartbeat > 10 * 60 * 1000))) {
-        throw new Error("O servidor WhatsApp do PC está desligado. Deixe o 'abrir-pwa.bat' ou 'npm run whatsapp' aberto no PC.");
+    if (!bridge || bridge.status === "disconnected") {
+        throw new Error("O servidor WhatsApp está desconectado. Verifique o servidor na nuvem ou no PC.");
     }
 
     const cmdId = Date.now() + "_" + Math.random().toString(36).slice(2, 7);
@@ -111,14 +107,15 @@ async function executeSupabaseWhatsappBridgeCmd(cmdPayload, timeoutMs = 20000) {
 
     const startTime = Date.now();
     while (Date.now() - startTime < timeoutMs) {
-        await new Promise(r => setTimeout(r, 1400));
+        await new Promise(r => setTimeout(r, 2000));
+        // Busca apenas o subcampo whatsapp_cmd (~150 bytes em vez de baixar db_content inteiro)
         const { data: checkRow } = await supabaseClient
             .from("granja_data")
-            .select("db_content")
+            .select("whatsapp_cmd:db_content->whatsapp_cmd")
             .eq("id", row.id)
             .maybeSingle();
 
-        const currentCmd = checkRow?.db_content?.whatsapp_cmd;
+        const currentCmd = checkRow?.whatsapp_cmd;
         if (currentCmd && currentCmd.id === cmdId) {
             if (currentCmd.status === "done") {
                 return currentCmd.result || {};
@@ -331,10 +328,12 @@ export function toggleWhatsappApiFields() {
         checkSelfHostedWhatsappStatus(false);
         selfHostedStatusInterval = setInterval(() => {
             const configPage = document.getElementById("page-configuracoes");
-            if (configPage && configPage.classList.contains("active")) {
+            const badge = document.getElementById("whatsappApiStatusBadge");
+            const alreadyConnected = badge && badge.textContent === "WhatsApp Conectado";
+            if (configPage && configPage.classList.contains("active") && !alreadyConnected) {
                 checkSelfHostedWhatsappStatus(false);
             }
-        }, 4000);
+        }, 15000);
     } else if (provider === "evolution") {
         if (selfPanel) selfPanel.style.display = "none";
         if (urlField) urlField.style.display = "block";

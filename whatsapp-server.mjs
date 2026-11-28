@@ -29,6 +29,9 @@ let connectedUser = null;
 let isReconnecting = false;
 let isProcessingBridge = false;
 let authBackupTimer = null;
+let lastAuthBackupAt = 0;
+let lastSyncedBridgeSignature = "";
+const AUTH_BACKUP_MIN_INTERVAL_MS = 15 * 60 * 1000; // No máximo 1 backup de sessão a cada 15 min
 
 // ─── Backup e Restauração da Sessão do WhatsApp no Supabase (Para Nuvem 24h / Render) ───
 async function restoreAuthSessionFromSupabase() {
@@ -64,8 +67,13 @@ async function restoreAuthSessionFromSupabase() {
     }
 }
 
-function scheduleAuthSessionBackupToSupabase() {
+function scheduleAuthSessionBackupToSupabase(forceImmediate = false) {
     if (authBackupTimer) clearTimeout(authBackupTimer);
+    const elapsed = Date.now() - lastAuthBackupAt;
+    const delayMs = forceImmediate
+        ? 5000
+        : Math.max(30000, AUTH_BACKUP_MIN_INTERVAL_MS - elapsed);
+
     authBackupTimer = setTimeout(async () => {
         try {
             const credsPath = path.join(AUTH_DIR, "creds.json");
@@ -97,8 +105,10 @@ function scheduleAuthSessionBackupToSupabase() {
                 .from("granja_data")
                 .update({ db_content: content })
                 .eq("id", row.id);
+            lastAuthBackupAt = Date.now();
+            console.log("[WhatsApp Cloud] Backup da sessão atualizado no Supabase (modo econômico).");
         } catch (_) {}
-    }, 3000);
+    }, delayMs);
 }
 
 async function clearAuthSessionInSupabase() {
@@ -121,8 +131,11 @@ async function clearAuthSessionInSupabase() {
     } catch (_) {}
 }
 
-async function syncBridgeStatusToSupabase() {
+async function syncBridgeStatusToSupabase(force = false) {
     try {
+        const signature = `${connectionStatus}|${connectedUser?.id || ""}|${currentQrDataUrl ? "qr" : "noqr"}`;
+        if (!force && signature === lastSyncedBridgeSignature) return;
+
         const { data: row, error } = await supabase
             .from("granja_data")
             .select("id, db_content")
@@ -145,6 +158,7 @@ async function syncBridgeStatusToSupabase() {
             .from("granja_data")
             .update({ db_content: content })
             .eq("id", row.id);
+        lastSyncedBridgeSignature = signature;
     } catch (_) {}
 }
 
@@ -370,8 +384,8 @@ async function startWhatsApp(forceFresh = false) {
                     name: sock.user?.name || "WhatsApp Granja"
                 };
                 console.log(`[WhatsApp API] Conectado com sucesso como: ${connectedUser.name} (${connectedUser.id})`);
-                syncBridgeStatusToSupabase();
-                scheduleAuthSessionBackupToSupabase();
+                syncBridgeStatusToSupabase(true);
+                scheduleAuthSessionBackupToSupabase(true);
             }
 
             if (connection === "close") {
@@ -584,28 +598,13 @@ const RENDER_URL = process.env.RENDER_EXTERNAL_URL || "https://granja-bykk.onren
 server.listen(PORT, "0.0.0.0", () => {
     console.log(`====================================================`);
     console.log(`[WhatsApp API] Servidor Próprio rodando na porta ${PORT}`);
-    console.log(`[WhatsApp Bridge] Ponte em nuvem (Realtime + Economia de Egress) ativa!`);
+    console.log(`[WhatsApp Bridge] Modo Ultra-Econômico de Egress ativo (< 1 MB/dia)!`);
     console.log(`====================================================`);
     startWhatsApp();
-    // Escuta em tempo real (evita downloads repetidos do db_content em repouso)
-    try {
-        supabase
-            .channel("granja-whatsapp-bridge")
-            .on(
-                "postgres_changes",
-                { event: "UPDATE", schema: "public", table: "granja_data" },
-                () => {
-                    pollSupabaseBridgeCommands();
-                }
-            )
-            .subscribe();
-    } catch (_) {}
 
-    // Fallback ultraleve a cada 20s (só baixa db_content se status === 'pending')
-    setInterval(pollSupabaseBridgeCommands, 20000);
-    // Heartbeat de status a cada 5 minutos (mudanças de conexão já sincronizam imediatamente)
-    setInterval(syncBridgeStatusToSupabase, 5 * 60 * 1000);
-    // Keep-alive automático a cada 10 minutos para evitar hibernação no Render Free
+    // Check ultraleve a cada 30s (retorna [] = 2 bytes quando não há comando pendente; NÃO usa Realtime em granja_data para evitar push de 114 KB por UPDATE)
+    setInterval(pollSupabaseBridgeCommands, 30000);
+    // Keep-alive automático a cada 10 minutos no próprio Render (0 bytes no Supabase)
     setInterval(() => {
         fetch(`${RENDER_URL}/status`).catch(() => {});
     }, 10 * 60 * 1000);

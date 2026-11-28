@@ -78,7 +78,7 @@ export async function loadFromSupabase() {
             supabaseClient.from('insumos').select('*'),
             supabaseClient.from('usuarios').select('*'),
             supabaseClient.from('plantel').select('*'),
-            supabaseClient.from('granja_data').select('id, db_content, updated_at').order('updated_at', { ascending: false }).limit(1).maybeSingle(),
+            supabaseClient.from('granja_data').select('id, updated_at, empresa:db_content->empresa, config_empresa:db_content->config->empresa, logs:db_content->logs').order('updated_at', { ascending: false }).limit(1).maybeSingle(),
             supabaseClient.from('empresa').select('*').eq('id', 1).maybeSingle(),
             supabaseClient.from('logs_sistema').select('*').order('data_hora', { ascending: false }).limit(250)
         ]);
@@ -105,9 +105,8 @@ export async function loadFromSupabase() {
                 favorecidoPix: d.favorecido_pix || "",
                 mensagemRodape: d.mensagem_rodape
             };
-        } else if (!resGranjaData.error && resGranjaData.data?.db_content) {
-            const content = resGranjaData.data.db_content;
-            empresaRemota = content.empresa || content.config?.empresa || null;
+        } else if (!resGranjaData.error && resGranjaData.data) {
+            empresaRemota = resGranjaData.data.empresa || resGranjaData.data.config_empresa || null;
         }
 
         if (empresaRemota) {
@@ -119,8 +118,8 @@ export async function loadFromSupabase() {
         if (!resLogsTable.error && Array.isArray(resLogsTable.data) && resLogsTable.data.length > 0) {
             db.logs = resLogsTable.data;
             localStorage.setItem(LOGS_STORE_KEY, JSON.stringify(db.logs));
-        } else if (!resGranjaData.error && Array.isArray(resGranjaData.data?.db_content?.logs)) {
-            db.logs = resGranjaData.data.db_content.logs;
+        } else if (!resGranjaData.error && Array.isArray(resGranjaData.data?.logs)) {
+            db.logs = resGranjaData.data.logs;
             localStorage.setItem(LOGS_STORE_KEY, JSON.stringify(db.logs));
         }
 
